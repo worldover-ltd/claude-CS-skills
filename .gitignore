@@ -1,0 +1,6 @@
+# Runtime session artifacts produced when running skills
+.workflow/
+
+# OS / editor cruft
+.DS_Store
+*.swp

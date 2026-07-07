@@ -1,0 +1,285 @@
+0: Method of Manufacturing (MoM) / Manufacturing Flow Chart | Method of Manufacturing
+1: Microplastics Free Statement | Microplastics Statement
+2: Denatured Alcohol Statement
+3: Petrochemicals Free Statement
+4: Roundtable of Sustainable Palm Oil (RSPO) Certified Statement
+5: Vegan Statement
+6: Nagoya Protocol on Access and Benefit-Sharing (ABS) Statement
+7: Pesticides Statement | Pesticides Free Statement
+8: Heavy Metals Statement | Free statement as per Annex II of 1223/2009
+9: Cruelty Free Statement
+10: Child Labour Statement
+11: Hot Water Bath Test (Aerosol)
+12: Hot Test (Aerosol) 
+13: Cold Test (Aerosol) 
+14: Dermatological Safety Report
+15: Sustainability Report
+16: Hypoallergenic Test Report
+17: New Substances Notification (NSN) 
+18: Product Composition Statement | INCI and Raw Materials (Separate Allergens) | INCI and Raw Materials (Separate Allergens) without % | INCI (Separate Allergens) | Allergens Report | Ingredient Listing Statement (ILS) | Raw Material Breakdown
+19: US Wide Statement of Safety
+20: Leaping Bunny Certification
+21: Packaging Artwork
+22: Safety Data Sheet (SDS)
+23: CAD Drawing of Packaging
+24: Cosmetic Product Safety Report (CPSR)
+25: Product Stability Test Report
+26: Product Development Sample Evaluation
+27: Packaging Compatibility Test 
+28: Certificate of Analysis (CoA)
+29: Human Repeat Insult Patch Test (HRIPT)
+30: Technical Data Sheet (TDS)
+31: Preservative Efficacy Testing (PET)
+32: Production Methodology
+33: Microbiological Analaysis / Quality Test Report
+34: California Proposition 65 (Safe Drinking Water and Toxic Enforcement Act of 1986) Assessment
+35: Animal Testing Statement
+36: Toxicological and Safety Documentation
+37: Amine / Nitrosamines Statement
+38: Substance of Very High Concern (SVHC) Free Statement
+39: Carcinogenic, Mutagenic or Toxic for Reproduction (CMR) Substance Statement | CMR Free Statement
+40: Extraction Solvent Statement
+41: Volatile Organic Compound (VOC) Statement | VOC Free Statement
+42: Genetically Modified Organism (GMO) Free Statement | GMO Free Statement
+43: Gluten Free Statement
+44: Food Allergen Statement | Allergen Statement
+45: Nanomaterials Free Statement | Nanomaterials Statement
+46: EU Declaration of Conformity
+47: Particle Distribution Analysis
+48: Asbestos Free Statement
+49: Certificate of Compliance with Convention on Biodiversity
+50: Toxicological Risk Assessments (TRA) Report
+51: Drug Stability Report
+52: Source (Animal / Synthetic)
+53: Food Grade / Pharmacopeia Statement
+54: Fragrance Allergens Statement
+55: Statement on Reportable Ingredients under California Safe Cosmetics and Fragrance Act | California SB 312 Compliance Statement
+56: Per- and Polyfluorinated Substances (PFAS) Statement | PFAS Free Statement
+57: Safety Evaluation
+58: Fragrance Compliance Statement
+59: Statement of REACH Compliance (EU & UK)
+60: International Fragrance Associate (IFRA) Certificate
+61: Phototoxicity Test
+62: Skin Irritation Test
+63: EU 1223/2009 Statement of Safety
+64: Glycol Ether and Solvents Statement 
+65: Nitro Musks Declaration
+66: Camphor, Menthol & Eucalyptol Statement
+67: Swiss Volatile Organic Compound (VOC) Statement
+68: Polycyclic Musks Statement
+69: Antioxidant Statement
+70: BSE/TSE Statement | BSE/TSE Free Statement
+71: Convention on International Trade in Endangered Species (CITES) Statement | CITES Free Statement
+72: Solvent Statement
+73: Packaging Specifications
+74: Atranol & Chlorotranol Statement
+75: Propylene Glycol Free Statement
+76: Sulfate and Sulfite Free Statement
+77: Butylated Hydroxyanisole (BHA) and Butylated Hydroxytoluene (BHT) Free Statement
+78: Organic Ingredient Certificate
+79: Regulatory Information Sheet
+80: Phototoxicity Statement
+81: Vanillin & Ethyl Vanillin Free Statement
+82: Essential Oil Content Statement
+83: Parabens Free Statement | Paraben Statement
+84: Good Manufacturing Practices (GMP) Certificate
+85: Country of Origin Certificate (CoO)
+86: Palm Oil Free Statement
+87: Challenge Test (Preservative Efficacy Test) Report
+88: Claims Substantiation
+89: California Fragrance & Flavor Right to Know Substances Statement
+90: Safety Assessor Qualifications
+91: 1,4-Dioxane Statement | Free Statement on 1,4-Dioxane | 1,4-Dioxane Absence Statement
+92: Phthalates Free Statement
+93: California Proposition 65 (Safe Drinking Water and Toxic Enforcement Act of 1986) Statement | Prop 65 Starting Materials Statement | Prop 65 Materials Statement | Prop 65 Materials and Impurities Statement
+94: Synthetic Musks Statement
+95: Ethical & Sustainable Practices Statement
+96: California Safe Cosmetics Program Notification Evidence
+97: Cosmetic Product Notification Portal (CPNP) Evidence
+98: Alkylphenol Ethoxylates (APEs) Free Statement
+99: Submit Cosmetic Products Notification (SCPN) Confirmation
+100: FDA Product Registration Evidence
+101: Canada Health Cosmetic Product Registration Evidence
+102: Safety Data Sheet (SDS) - OSHA Compliant
+103: Company Registration Certificate
+104: Safety Substantiation
+105: ISO 16128 Natural Origin Index Statement
+106: Purity Statement - FDA
+107: Coconut Derivative Content Statement
+108: Purity Statement - EU
+109: Compliance Statement
+110: Project Brief
+111: Free From Statement
+112: Formula Approval Form
+113: Biodegredation Information
+114: Clinical Efficacy Report
+115: Biobased Attestation Statement
+116: MyMicrobiome Certification
+117: National Eczema Association Certification
+118: Product Specifications
+119: COSMetic Organic and Natural Standard (COSMOS) Statement
+120: Cosmetics Supervision and Administration Regulation (CSAR) Submission Evidence
+121: Impurity Statement
+122: Kosher Certificate
+123: Halal Certificate
+124: BSG ARG Registration
+125: ISO 9001:2015 Quality Management Systems
+126: Origin (Plant, Synthetic etc) Statement
+127: KMART Specific SDS
+128: Safety Data Sheet (SDS) - Brazil Compliant
+129: Declaration of Conformity
+130: KMART Specific Product Specification
+131: BSG Registration
+132: BSG Certificate of Analysis (CoA)
+133: ISO 9001 (Quality Management) Compliance Certificate
+134: British Retail Consortium (BRC)
+135: Primark Environmental Audit Certificate
+136: Primark Code of Conduct Audit Certificate
+137: Forest Stewardship Council (FSC) Certificate
+138: Disney Facility and Merchandise Authorization (FAMA)
+139: Supplier Ethical Data Exchange (SEDEX) Ethical Trade Audit
+140: ISO 14001 (Environmental Management) Compliance Certificate
+141: Refining History
+142: Packaging / Artwork Copy
+143: BSE / TSE Test Report
+144: Heavy Metals Test Report
+145: Singapore Product Registration Evidence
+146: Ocular Test - HET CAM
+147: Japan Product Registration Evidence
+148: Ocular Test – OptiSafe
+149: Korean Cosmetic Product Registration Evidence (Letter of Confirmation)
+150: Microbial Limits Test
+151: China Dossier
+152: NMPA Cosmetic Raw Material Registration - Annex 14 (China)
+153: Standard Operating Procedures (SOP)
+154: Date of Minimum Durability (DOMD) & Period After Opening (PAO) Statement
+155: Animal Derived Ingredients Free Statement
+156: Bulk Specification
+157: Product Image
+158: Material Specifications
+159: General Test Reports
+160: Weight Loss Test
+161: Other
+162: Cost Report
+163: Supplier Product Questionaire
+164: Product Dossier / Product Information Document
+165: Ingredient Listing Statement (ILS)
+166: Regulatory Dossier
+167: Technical Dossier
+168: Emails
+169: Combined INCI, ILS, and PAO Warning Statements
+170: Batch Sheet | Batch Sheet (Excel) | Batch Sheet (Word)
+171: General Cosmetic Compliance Statment
+172: Completed Batch Sheet
+173: Notification of Change
+174: Australian Industrial Chemicals Introduction Scheme (AICIS) Exemption Statement
+175: Specification Statement
+176: Change Control Statement
+177: Corporate Social Responsibility (CSR) Report
+178: Ecotoxicity Documentation
+179: Ingredient Mapping / Translations Statement
+180: Customer Restricted List
+181: Sulfate Free Statement
+182: Mineral Oil Statement
+183: Carcinogenic, Mutagenic or Toxic for Reproduction (CMR) Impurities Statement | Carcinogen, Mutagen or Reproductive (CMR) and Substances of Very High Concern (SVHC) Statement
+184: Wheat Statement
+185: Customer Manual
+186: Vegetarian Statement
+187: Soy Statement | Soy Materials Assessment
+188: Contains Substance of Very High Concern (SVHC) Statement
+189: Nut Statement
+190: Silicone Statement
+191: Period After Opening (PAO) Statement
+192: Caffine Statement | Statement on the caffine content of the item
+193: Formaldehyde Statement | Statement on the Formaldehyde content of the item
+194: Ocular Irritation Test
+195: Diethylene Glycol (DEG) Statement | Statement on the content of Diethylene Glycol (DEG) in the item
+196: 5-MOP (5-methoxypsoralen) Statement | Statement on the 5-MOP (5-methoxypsoralen) content of item
+197: Formula Specifications
+198: Shelf Life Statement | A statement of the shelf life of the item
+199: Fragrance Safety Evaluation (FSE)
+200: Use Test under Dermatological and Ophtalmological Control
+201: 3TG (Tin, Tantalum, Tungsten, Gold) Statement | 3TG is a collective term for tin, tantalum, tungsten and gold. They are conflict minerals and primarily extracted in the Democratic Republic of Congo (DRC) and neighbouring regions and in the conflict-affected and high-risk areas | 3TG (Tin, Tantalum, Tungsten, Gold) Free Statement
+202: Banded Product Composition Statement | Banded INCI and Raw Material Breakdown Report (Including Allergens) | Banded INCI Breakdown (Including Allergens)
+203: Marketing Information / Brochure
+204: Customer General Brief | A briefing document from the customer on their general ethos for products
+205: Supplier Quality Questionaire
+206: Endocrine Disruptors Free Statement | Regulation (EC) No 1223/2009 on cosmetic products.  
+According to the review of Regulation (EC) No 1223/2009 on cosmetic products containing endocrine-disrupting substances. The Commission launched a first public call for from 16 May -15 October on 14 substances that merit a higher priority for assessment. These substances include Benzophenone-3, kojic acid, 4-methylbenzylidene camphor, propylparaben, triclosan, resorcinol, octocrylene, triclocarban, butylated hydroxytoluene (BHT), benzophenone, homosalate, benzyl salicylate, genistein and daidzein. 
+207: Biodegradability Statement | Biodegradability Statement (OECD)
+208: China Compliance Statement
+209: Halal Statement | Statement on the Halal status of this product. Different from a Halal Certificate. This statement often covers whether the product meets the requirments to be Halal | Halal Compliance Statement
+210: Ethoxylated Ingredient Statement
+211: EU Deforestation Regulation Compliance Statement | Regulation (EU) 2023/1115 on the making available on the Union market and the export from the Union of certain commodities and products associated with deforestation and forest degradation
+212: New Born and Pregnancy Statement
+213: Kosher Statement | Kosher Statement, this is not a certificate | Kosher Compliance Statement
+214: Biochemical Statement
+215: Lactose Free Statement | In accordance with Regulation (EU) No. 1169/2011 of the European Parliament and of the Council on the provision of food information to consumers taking account of the Scientific Opinion of EFSA  Panel  on  Dietetic  Products,  Nutrition  and  Allergies  (NDA)  deals  with  lactose thresholds  in  lactose  intolerance. The statement ‘lactose free’’ only can be used if the lactose concentration is less than 0,01%. 
+216: Microbiology Statement
+217: Clean at Sephora Statement
+218: Canadian Hotlist Statement
+219: Statement of Lead and Mercury Content
+220: Certificate of Insurance (COI)
+221: IRS W-9 Tax Form
+222: Cosmetic Allergens Statement | Any allergens included in the cosmetic product
+223: Gas Chromatography (GC) Test Result
+224: NSF/ANSI 305 (National Sanitation Foundation / American National Standards Institute)
+225: BRIX Statement (Best Practices for Risk Assessment of Cosmetic Ingredients)
+226: Cosmetic Ingredient Review (CIR) Statement
+227: Generally Recognized As Safe (GRAS) | Generally Recognized As Safe (GRAS) under the FDA (Food and Drug Administration)
+228: Non-Organic Ingredient Declaration (NOID) | Non-Organic Ingredient Declaration (NOID) under the USDA National Organic Program (NOP)
+229: California Air Resources Board (CARB) Volatile Organic Compounds (VOCs) Statement
+230: Quality Policy
+231: Irradiation Statement
+232: Supplier Provided Composition Statement
+233: Signed Stability Test Waiver
+234: Animal Testing Assessment (ATA)
+235: Patch Test (Single Application) | Single Application Patch Test
+236: Use Test under Dermatological Control
+237: Raw Material Specification and Assay Report
+238: Raw Material Breakdown | A breakdown of just the raw materials in the formulation
+239: INCI and Raw Material Breakdown | A breakdown of all the ingredients and raw materials in a formulation | INCI and Raw Materials (Separate Allergens)
+240: Allergens Report | A breakdown of the allergens in the formulation | Allergens Report (Full Detail) | Allergens Report (Allergens Only) | Allergens Report (Allergens Only, Concentrations Redacted)
+241: INCI Breakdown | A breakdown of the ingredients in the formulation | INCI (Separate Allergens)
+242: Formulating Guide | Instructions of how to most effectively formulate with this item
+243: Raw Material with Supplier | Table of Raw Materials with their Suppliers (linked organisations)
+244: Combined INCI with Function, ILS, Lead Times | A document containing a table with ingredients with their functions, an ingredient listing statement and another table with raw materials with their ingredient breakdown and their lead time
+245: Raw Material with Origin | Table of Raw Materials with their Origin
+246: Formula Composition and Phasing | Document containing the phases table of the formulation
+247: COSHH Sheet | Control of Substances Hazardous to Health (COSHH)
+248: Cosmetic Product Safety Report (CPSR) - Part B Only
+249: Cosmetic Product Safety Report (CPSR) - Part A Only
+250: Cosmetic Product Safety Report (CPSR) - Redacted
+251: Test Method Calculations
+252: Receiving / Incoming Ticket
+253: IR Spectroscopy Test Report
+254: IR Spectroscopy Standard
+255: ISO Natural Indices | Documents showing the total natural Indices for raw materials in the formulation | ISO Natural Indices (Natural) | ISO Natural Indices (Organic)
+256: Raw Material Lead Time | Raw Material Lead Time Document | Combined INCI with Function, ILS, Lead Times | Combined INCI with Function, ILS, Lead Times (with Ingredients)
+257: Technical Drawing
+258: Component Test Report
+259: Cosmetic Certificate of Compliance (CCoC)
+260: Component Specification
+261: Ingredients Per Market | For the selected markets in the formulation designer, for each ingredient, the generated document will indicate whether the ingredient is compliant or not in each selected market. | Markets vs Ingredients
+262: ILS and INCI Breakdown (without %) | Ingredients List and INCI Breakdown for a product formulation, without percentages | ILS and INCI Breakdown (without % and separate Allergens)
+263: ILS and INCI Breakdown | Ingredients List and INCI Breakdown for a product formulation | ILS and INCI Breakdown (separate Allergens)
+264: ILS & INCI and Raw Material Breakdown | Ingredients List, INCI Breakdown and Raw Material Breakdown for a product formulation | ILS & INCI and Raw Material Breakdown (Separate Allergens)
+265: ILS & INCI and Raw Material Breakdown (without %) | Ingredients List, INCI Breakdown and Raw Material Breakdown for a product formulation, without percentages | ILS & INCI and Raw Material Breakdown (without % and Separate Allergens)
+266: INCI and Raw Material Breakdown (including OTC) | A breakdown of all the ingredients and raw materials in a formulation, with OTC ingredients | INCI and Raw Materials (including OTC) | INCI and Raw Materials (including OTC and separate Allergens)
+267: INCI and Raw Material Breakdown (including Organic) | A breakdown of all the ingredients and raw materials in a formulation, including organic ingredients | INCI and Raw Materials (including Organic) | INCI and Raw Materials (including Organic and separate Allergens)
+268: INCI and Raw Material Breakdown (Without %) | A breakdown of all the ingredients and raw materials in a formulation, without percentages | INCI and Raw Materials (Without %) | INCI and Raw Materials (Without % and separate Allergens)
+269: Raw Material Properties Report | The Raw Material Properties report shows the properties of all Raw Materials used in a specific formulation
+270: Compare Formulations | A report detailing the comparison between two formulations
+271: R&D Batch Sheet
+272: Compounding Batch Sheet
+273: Statement of Lead and Mercury Content
+274: Certificate of Origin
+275: Analytical Report | A scientific document that presents the results of laboratory testing performed on a raw material or product.
+276: Post Consumer Resin (PCR) Certification
+277: Quote
+278: Pallet Plan
+279: Quality Inspection Report
+280: Cutter Guide / Print Area
+281: Line Trial Report
+282: Service Level Agreement (SLA) | Service Level Agreement
+283: Formula Insights

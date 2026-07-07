@@ -1,0 +1,10 @@
+{
+  "name": "assign-documents",
+  "version": "0.1.0",
+  "description": "Categorize documents and assign them to items in a source of Excel files, then produce a consolidated Excel report. Aimed at cosmetics, chemicals and other substance-based industries.",
+  "author": {
+    "name": "Frederico Correia",
+    "email": "frederico.correia@worldover.io"
+  },
+  "keywords": ["documents", "excel", "categorization", "cosmetics", "regulatory", "compliance"]
+}
