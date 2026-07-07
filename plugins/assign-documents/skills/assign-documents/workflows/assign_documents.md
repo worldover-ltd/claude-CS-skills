@@ -57,8 +57,8 @@ Store the file on: .workflow/active/${sessionId}/EXCEL_FILES_DATA.json
 
 # Step 4
 
-Assign every document to an Excel row (or "NONE") and categorize it, by fanning the work out
-across sub-agents.
+Assign every document to the Excel row(s) it references (zero, one, or many) and categorize it, by
+fanning the work out across sub-agents.
 
 > **Critical — read before implementing.** The batch each agent works on MUST be partitioned in
 > the orchestration code and passed to the agent as an **explicit, literal list of file paths**.
@@ -93,8 +93,10 @@ export const meta = {
 const BATCH_SIZE = 10
 const MAX_RECONCILE_ROUNDS = 2
 
-// One result object PER input document — including non-matches (row_ref: "NONE").
+// One result object PER input document (even documents with no match).
 // Returning every input document is what lets us verify complete coverage.
+// A document may match MULTIPLE items: row_refs holds every matched row.ref
+// (empty array = no match). Categorization is per-document, not per-match.
 const BATCH_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -105,10 +107,13 @@ const BATCH_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['doc_path', 'row_ref', 'category', 'is_new_category'],
+        required: ['doc_path', 'row_refs', 'category', 'is_new_category'],
         properties: {
           doc_path: { type: 'string' },                       // must equal an input path, verbatim
-          row_ref: { type: 'string' },                        // matched row.ref, or "NONE"
+          row_refs: {                                          // every matched row.ref; [] = no match
+            type: 'array',
+            items: { type: 'string' },
+          },
           category: { type: 'string' },                       // chosen/created category name, or "NONE"
           is_new_category: { type: 'boolean' },               // true if not from document_categories.txt
         },
@@ -135,8 +140,9 @@ ${batch.map((d, i) => `${i + 1}. ${d.path}`).join('\n')}
 For EACH document file above, do the following:
 - Read the document file and access its content.
 - Read the Excel data at ".workflow/active/${sessionId}/EXCEL_FILES_DATA.json".
-- Determine whether the document references any item in the "rows" arrays of that file. If it
-  does, set "row_ref" to that row's "ref"; if it matches none, set "row_ref" to "NONE".
+- Determine every item in the "rows" arrays of that file that the document references — a single
+  document can relate to more than one item. Set "row_refs" to the list of ALL matching rows'
+  "ref" values. If it matches none, set "row_refs" to an empty array [].
 - Categorize the document by picking the most relevant category from
   "${pluginRoot}/skills/assign-documents/lib/document_categories.txt". If none fits, create a new
   category name (max 20 characters) and set "is_new_category" to true; otherwise false. When the
@@ -182,10 +188,11 @@ if (missing.length) {
   log(`WARNING: ${missing.length} document(s) still unmatched after ${MAX_RECONCILE_ROUNDS} rounds — they will be written as UNPROCESSED, not dropped.`)
 }
 
-// Return results aligned to the authoritative list. Every input document appears exactly once.
+// Return results aligned to the authoritative list. Every input document appears exactly once,
+// each carrying zero or more matched row_refs.
 return {
   results: documents.map(d =>
-    byPath.get(d.path) ?? { doc_path: d.path, row_ref: 'NONE', category: 'NONE', is_new_category: false, unprocessed: true }
+    byPath.get(d.path) ?? { doc_path: d.path, row_refs: [], category: 'NONE', is_new_category: false, unprocessed: true }
   ),
   unprocessed: missing.map(d => d.path),
 }
@@ -200,24 +207,28 @@ return {
 
 # Step 5
 
-Generate an excel file where each row is one of the documents, iterating the **authoritative**
+Generate an excel file with **one row per document–item pair**, iterating the **authoritative**
 `DOCUMENT_FILES.json` list joined to the workflow results by `doc_path` (never iterate only what
-the agents returned). For a matched `row_ref`, look up the row in `EXCEL_FILES_DATA.json` to fill
-the Excel-side columns. For `row_ref === "NONE"` (including any `unprocessed` documents), leave the
-Excel-side columns blank. Columns:
+the agents returned). A document that matched N items produces N rows (the document/category
+columns repeat, the Excel-side columns differ per matched item). A document with an empty
+`row_refs` (no match, including any `unprocessed` documents) produces exactly **one** row with the
+Excel-side columns left blank — so every document is represented even when it matched nothing. For
+each matched `row_ref`, look up the row in `EXCEL_FILES_DATA.json` to fill the Excel-side columns.
+Columns:
 
 - "Document File" -> file name of the document (from `doc_path`)
 - "Category Name" -> `category` of the document
 - "Is New Category" -> "YES" if `is_new_category` is true, otherwise "NO"
-- "Matched Item" -> primary column value of the matched item (prefer the item's name if available); blank when `row_ref` is "NONE"
-- "Matched Excel File" -> file name of the excel file the matched row belongs to; blank when "NONE"
-- "excel_row_ref" -> `row_ref` value of the row item ("NONE" when unmatched)
-- "excel_path" -> file path of the row item's excel file; blank when "NONE"
-- "excel_sha" -> SHA value of the excel file; blank when "NONE"
+- "Matched Item" -> primary column value of the matched item (prefer the item's name if available); blank when the document matched no item
+- "Matched Excel File" -> file name of the excel file the matched row belongs to; blank when no match
+- "excel_row_ref" -> the row's `ref` value for this pair; blank when no match
+- "excel_path" -> file path of the matched row's excel file; blank when no match
+- "excel_sha" -> SHA value of that excel file; blank when no match
 - "doc_path" -> file path of the document file
 - "doc_sha" -> SHA value of the document file (from `DOCUMENT_FILES.json`)
 
-For any document flagged `unprocessed`, write its row with the document columns populated and the
-category/Excel columns blank, so the count of rows always equals the count in `DOCUMENT_FILES.json`.
+Coverage check: every document in `DOCUMENT_FILES.json` must appear in at least one row. The total
+row count equals the sum of `max(1, row_refs.length)` across all documents. Documents flagged
+`unprocessed` still get their single blank-match row, never dropped.
 
 Place the file on ".workflow/active/${sessionId}/ASSIGNED_DOCUMENTS.xlsx"
