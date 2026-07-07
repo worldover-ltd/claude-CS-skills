@@ -6,7 +6,7 @@ document and compliance workflows.
 ## Install
 
 ```
-/plugin marketplace add frederico-correia-worldover/claude-skills-marketplace
+/plugin marketplace add worldover-ltd/claude-CS-skills
 /plugin install assign-documents
 ```
 
