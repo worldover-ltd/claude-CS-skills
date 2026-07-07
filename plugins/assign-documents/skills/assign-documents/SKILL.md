@@ -1,19 +1,27 @@
 ---
 name: assign-documents
-description: "Skill to categorize documents and assigning them to items present on a source of excel files. Triggers on \"assign-documents\" or when user asks to categorize some documents, match documents to excel file(s) or match documents to some type of items."
+description: "Skill to categorize documents and assigning them to items present on a source of excel files. Triggers on \"assign-documents\" or when user asks to categorize/match/assign documents to some type of items or sheet file(s), or if the user wants to prepare some documents for uploading/migrating."
 allowed-tools: Skill, Agent, AskUserQuestion, TodoWrite, Read, Write, Edit, Bash, Glob, Grep
 ---
 
 ### Context
 
-The user will provide files related to products, raw materials or other items related to the area of cosmetics, chemicals and other substance-based industries.
+The user will provide document files related to products, raw materials or other items related to the area of cosmetics, chemicals and other substance-based industries.
+The user will provide excel files, these contain migration data for a specific customer.
+This process is part of an initial setup to assign these documents to specific items on the customer's excel files, later on the user will migrate this data and the documents to the customer's app.
 
 ### Goal
 
 THe goal is to take the document files and do the following:
-- categorize them.
-- assign them to a specific item in an excel file.
+- categorize them into document categories.
+- assign them to specific item(s) in the excel files.
 - produce a final excel file listing all of this information.
+
+# General Instructions
+
+- Follow the instructions in "${CLAUDE_PLUGIN_ROOT}/skills/assign-documents/specs/MAIN_AGENT_PROMPT.md"
+- Refer to the documents as the "customer's documents".
+- Refer to the excel files as the "customer's data sheet" files.
 
 ### Session setup
 
@@ -29,17 +37,20 @@ Files inside this skill are referenced relative to the skill's install location 
 from a raw checkout instead of an installed plugin, treat `${CLAUDE_PLUGIN_ROOT}` as the plugin
 root directory (the folder containing this `skills/` directory).
 
-### Instructions
+### Process
+
+Follow these steps in a sequence to go through the process.
+The user might ask to revisit a previous step, restart from the beginning on a new set of files or ask you to modify the output file.
 
 # Step 1
 
 Do the following in sequence:
-1. prompt the user for the the document files -> the user should provide specific documents or a folder containing documents.
+1. prompt the user for the document files -> the user should provide specific documents or a folder containing documents.
   - never read the document files on your own decision
   - maintain the list of documents according to the "### Keeping track of documents" section
-2. write to the user a sample of the file names in a list format (no more than 10) + a total count of the files, ask for the user to confirm it.
+2. write to the user a sample of the file names in a list format (no more than 10) + a total count of the files, suggest the user to verify and proceed to next step
 3. prompt the user for excel files to match the documents with -> the user should provide specific excel files.
-4. write to the user a sample of the file names in a list format (no more than 10) + a total count of the files, ask for the user to confirm it.
+4. write to the user a sample of the file names in a list format (no more than 10) + a total count of the files, suggest the user to verify and proceed to next step
 
 # Step 2
 
@@ -49,11 +60,12 @@ Analyze the excel files:
 
 # Step 3
 
-For each excel file group from "# Step 2", one at a time, do the following in sequence:
-1. prompt the user with a multi-selection question for which items on the file the documents should be assigned to, offer suggestions from items found on "# Step 2".
-2. for each item figure out where the item can be found in the excel file, look for columns related to the area mentioned in the "## Context" section (examples: "Name", "Trade Name", "Product", "Raw Material", "Code", "SKU", "Primary Identifier", etc...).
-3. write down in a table format what tab and columns for each item you've chosen to use to identify them, ask the user to revise and confirm or ask for changes
-4. store this information by following the instructions on "${CLAUDE_PLUGIN_ROOT}/skills/assign-documents/specs/EXCEL_FILE_ITEMS.md"
+1. for each item figure out where the item can be found in the excel file, look for columns related to the area mentioned in the "## Context" section (examples: "Name", "Trade Name", "Product", "Raw Material", "Code", "SKU", "Primary Identifier", etc...).
+  2.1. the "primary columns" should be unique values such (ex: "Primary Identifier" or "Code"), the name of the item can be used as primary if no unique value exists.
+  2.2. the "secondary columns" should be non-unique values such as its name, these are to be used as extra information to help identify the item when data is limited.
+  2.3. always store this information and keep it up to date by following the instructions on "${CLAUDE_PLUGIN_ROOT}/skills/assign-documents/specs/EXCEL_FILE_ITEMS.md"
+2. For each excel file group from "# Step 2" write down in a table format what tab and columns for each item you've chosen to use to identify them, ask the user to revise and confirm or ask for changes
+3. For each excel file group from "# Step 2" in sequence: prompt the user with a multi-selection question for which items on the file the documents should be assigned to, offer suggestions from items found on "# Step 2".
 5. continue re-doing these steps until the user has confirmed, when confirmed move to next step
 
 # Step 4
@@ -62,7 +74,8 @@ Execute the plan described on "${CLAUDE_PLUGIN_ROOT}/skills/assign-documents/wor
 
 # Step 5
 
-Inform the user its completed and locate to him where the output excel file is at.
+Place the output excel file in an appropriate location close to the user provided files.
+Inform the user the task is completed and inform where the output excel file is located.
 
 ### Keeping track of documents
 
