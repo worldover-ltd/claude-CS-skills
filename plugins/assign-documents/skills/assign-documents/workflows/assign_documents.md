@@ -101,6 +101,9 @@ export const meta = {
 
 const BATCH_SIZE = 10
 const MAX_RECONCILE_ROUNDS = 2
+// Matching is a high-volume, fairly mechanical read-and-classify task, so run the sub-agents on a
+// cheaper/faster model. Bump to 'sonnet' if match/category quality on your documents is too low.
+const MATCH_MODEL = 'haiku'
 
 // One result object PER input document (even documents with no match).
 // Returning every input document is what lets us verify complete coverage.
@@ -166,7 +169,7 @@ async function matchRound(docs, phase) {
   const batches = chunk(docs, BATCH_SIZE)
   const perBatch = await parallel(
     batches.map((batch, i) => () =>
-      agent(promptFor(batch), { label: `match:batch-${i}`, phase, schema: BATCH_SCHEMA })
+      agent(promptFor(batch), { label: `match:batch-${i}`, phase, model: MATCH_MODEL, schema: BATCH_SCHEMA })
         .then(r => (r?.results ?? []).filter(x => docs.some(d => d.path === x.doc_path)))
     )
   )
