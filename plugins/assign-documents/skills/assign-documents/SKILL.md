@@ -138,7 +138,4 @@ The user might require your help on the actions that the user needs to do himsel
 
 Offer help to the user proactively or when the user asks for it.
 
-When assisting the user, read the bundled tutorial at
-"${CLAUDE_PLUGIN_ROOT}/skills/assign-documents/specs/USER_INSTRUCTIONS.md" and base your guidance on
-it. It walks through uploading the documents to the customer's app (and downloading the upload
-manifest json), organizing the files, and running the skill.
+When assisting the user, use this file for your own guidance: "${CLAUDE_PLUGIN_ROOT}/skills/assign-documents/references/USER_INSTRUCTIONS.md"
