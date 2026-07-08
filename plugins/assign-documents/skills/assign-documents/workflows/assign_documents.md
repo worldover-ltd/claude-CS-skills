@@ -290,7 +290,16 @@ then edit the copy:
 2. For each item tab that has edits, add two columns (headers on the same header row Step 3 used):
    - **`Matched Documents`** — human-readable. **Insert** it next to the item's human-readable
      identifier column(s) (per `EXCEL_FILES_ITEMS.md`), in a sensible place. Value: the matched file
-     names grouped by category, one line per category, e.g. `Certificate of Analysis (CoA): a.pdf, b.pdf`.
+     names grouped by category, with each category on its own line ending in `:` and each file on
+     its own line prefixed with `- ` (newline-separated). The cell must have wrap-text enabled so the
+     newlines render. Example:
+     ```
+     Certificate of Analysis (CoA):
+     - a.pdf
+     - b.pdf
+     Safety Data Sheet (SDS):
+     - c.pdf
+     ```
    - **`alreadyUploadedToSupabaseMatchedDocuments`** — machine-readable, appended as the **last**
      column. Value: a JSON string holding that row's matched docs — the manifest fields except
      `sha`, plus `documentTemplateId`:
@@ -303,6 +312,22 @@ merged cells, and styling on a sample file before trusting the result on the cus
 
 ```python
 import json, hashlib, shutil, openpyxl
+from collections import OrderedDict
+from openpyxl.styles import Alignment
+
+def human_matched(docs):
+    # group file names by category, preserving first-seen order:
+    #   <category>:
+    #   - file1
+    #   - file2
+    groups = OrderedDict()
+    for d in docs:
+        groups.setdefault(d["category"], []).append(d["fileName"])
+    lines = []
+    for cat, files in groups.items():
+        lines.append(f"{cat}:")
+        lines.extend(f"- {fn}" for fn in files)
+    return "\n".join(lines)
 
 def template_id(name):
     return "dt_" + hashlib.sha256(name.strip().lower().encode()).hexdigest()[:12]
@@ -341,7 +366,7 @@ def upsert_document_templates(wb, categories):
 #   "tabs": [{
 #       "tab": "products", "header_row": 1,
 #       "human_before_header": "<existing header to insert Matched Documents before>",
-#       "rows": [{"row": 7, "human": "...", "docs": [ {fileName, storageKey, sha, category} ]}]
+#       "rows": [{"row": 7, "docs": [ {fileName, storageKey, sha, category} ]}]  # Matched Documents text is built from docs
 #   }]
 # }
 def apply(plan):
@@ -354,7 +379,8 @@ def apply(plan):
         ws.insert_cols(before); ws.cell(hr, before, "Matched Documents")
         json_c = ws.max_column + 1; ws.cell(hr, json_c, "alreadyUploadedToSupabaseMatchedDocuments")
         for r in t["rows"]:
-            ws.cell(r["row"], before, r["human"])
+            cell = ws.cell(r["row"], before, human_matched(r["docs"]))
+            cell.alignment = Alignment(wrap_text=True, vertical="top")
             docs = [{"fileName": d["fileName"], "storageKey": d["storageKey"],
                      "documentTemplateId": ids[d["category"].strip().lower()]}
                     for d in r["docs"] if d["category"].strip().lower() in ids]
