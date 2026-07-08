@@ -292,8 +292,9 @@ then edit the copy:
      identifier column(s) (per `EXCEL_FILES_ITEMS.md`), in a sensible place. Value: the matched file
      names grouped by category, one line per category, e.g. `Certificate of Analysis (CoA): a.pdf, b.pdf`.
    - **`alreadyUploadedToSupabaseMatchedDocuments`** — machine-readable, appended as the **last**
-     column. Value: a JSON string mirroring the manifest shape, holding that row's matched docs:
-     `{"documents":[{"fileName":…,"storageKey":…,"sha":…,"documentTemplateId":…}, …]}`.
+     column. Value: a JSON string holding that row's matched docs — the manifest fields except
+     `sha`, plus `documentTemplateId`:
+     `{"documents":[{"fileName":…,"storageKey":…,"documentTemplateId":…}, …]}`.
    - Only matched rows get values; leave the columns blank on all other rows.
 
 Apply the edits with a script (below) rather than by hand — `openpyxl` preserves the workbook's other
@@ -354,7 +355,7 @@ def apply(plan):
         json_c = ws.max_column + 1; ws.cell(hr, json_c, "alreadyUploadedToSupabaseMatchedDocuments")
         for r in t["rows"]:
             ws.cell(r["row"], before, r["human"])
-            docs = [{"fileName": d["fileName"], "storageKey": d["storageKey"], "sha": d["sha"],
+            docs = [{"fileName": d["fileName"], "storageKey": d["storageKey"],
                      "documentTemplateId": ids[d["category"].strip().lower()]}
                     for d in r["docs"] if d["category"].strip().lower() in ids]
             ws.cell(r["row"], json_c, json.dumps({"documents": docs}, ensure_ascii=False))
