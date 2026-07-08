@@ -77,20 +77,28 @@ fanning the work out across sub-agents.
 > Every fan-out MUST also be reconciled against the authoritative input list (see the reconcile
 > loop below) so any gap surfaces instead of being hidden by duplicate results.
 
-## 4.1 — Read the authoritative input (orchestrator, in the main loop)
+## 4.1 — Build a self-contained script (orchestrator, in the main loop)
 
-Workflow scripts have no filesystem access, so read the inputs first and pass them into the
-workflow via `args`:
+Do NOT pass the inputs through the Workflow tool's `args`. Passing `args` alongside `scriptPath`
+has silently failed (delivered `undefined`), which corrupts every path to
+`.workflow/active/undefined/...` and produces an empty, no-op run. Instead, bake the runtime values
+directly into the script text as literals, so there is nothing to marshal across the tool boundary:
 
 1. Read `.workflow/active/${sessionId}/DOCUMENT_FILES.json` → the authoritative array of
-   `{ SHA, path }` documents. This array is the source of truth for completeness.
-2. Invoke the Workflow tool with:
-   `args = { documents: <that array>, sessionId: "${sessionId}", pluginRoot: "${CLAUDE_PLUGIN_ROOT}" }`
+   `{ SHA, path }` documents. This array is the source of truth for completeness. Record its
+   length as `N`.
+2. Take the script template in 4.2 and replace the three placeholders **with literal values**:
+   - `__SESSION_ID__` → the current `${sessionId}`
+   - `__PLUGIN_ROOT__` → the current `${CLAUDE_PLUGIN_ROOT}`
+   - `__DOCUMENTS_JSON__` → the documents array, as a JSON literal (e.g. `JSON.stringify` of it)
+3. Write the substituted script to a file and launch it with `Workflow({ scriptPath })` — **no `args`**.
 
-## 4.2 — Workflow script
+## 4.2 — Workflow script (template)
 
-Run the following as the workflow. It chunks the document list **in code**, gives each agent its
-own explicit slice, forces structured output with a schema, then reconciles and re-runs gaps.
+Substitute the three placeholders as described in 4.1 before launching. The script chunks the
+document list **in code**, gives each agent its own explicit slice, forces structured output with a
+schema, then reconciles and re-runs gaps. The guards at the top turn a missed substitution into a
+loud failure instead of a silent empty run.
 
 ```javascript
 export const meta = {
@@ -134,7 +142,19 @@ const BATCH_SCHEMA = {
   },
 }
 
-const { documents, sessionId, pluginRoot } = args
+// Runtime values are substituted in by the orchestrator (see 4.1) — NOT read from `args`.
+const sessionId = '__SESSION_ID__'
+const pluginRoot = '__PLUGIN_ROOT__'
+const documents = __DOCUMENTS_JSON__   // array of { SHA, path }, written in as a JSON literal
+
+// Fail fast: a missed substitution must abort loudly, never build a `.workflow/active/undefined/...`
+// path and silently return an empty result set.
+if (!sessionId || sessionId.includes('__') || !pluginRoot || pluginRoot.includes('__')) {
+  throw new Error('sessionId/pluginRoot were not substituted into the script — aborting')
+}
+if (!Array.isArray(documents) || documents.length === 0) {
+  throw new Error('documents list is empty or not substituted — aborting')
+}
 
 const chunk = (arr, n) =>
   Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n))
@@ -212,8 +232,11 @@ return {
 
 ## 4.3 — After the workflow
 
-- The workflow returns exactly one result per input document, in the same order as
-  `DOCUMENT_FILES.json`. Confirm the count equals the input count before continuing.
+- **Coverage assertion (required).** Assert `results.length === N` (the `DOCUMENT_FILES.json` count
+  from 4.1) and `N > 0`. If the count is `0` or does not match, the run did not do its job (this is
+  exactly how the `args`/empty-path failure manifested: `0 !== 171`) — **stop, report the mismatch,
+  and do NOT proceed to Step 5.** Annotating with an empty result set would silently produce no-op
+  files.
 - If `unprocessed` is non-empty, tell the user which documents could not be matched after retries.
   These are carried into the output (Step 5), never silently dropped.
 
