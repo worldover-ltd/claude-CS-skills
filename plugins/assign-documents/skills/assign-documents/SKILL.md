@@ -8,6 +8,7 @@ allowed-tools: Skill, Agent, AskUserQuestion, TodoWrite, Read, Write, Edit, Bash
 
 The user will provide document files related to products, raw materials or other items related to the area of cosmetics, chemicals and other substance-based industries.
 The user will provide excel files, these contain migration data for a specific customer.
+Before running this skill the user has already uploaded the documents to the customer's app, and provides an upload manifest json describing that upload (see "### The upload manifest").
 This process is part of an initial setup to assign these documents to specific items on the customer's excel files, later on the user will migrate this data and the documents to the customer's app.
 
 ### Goal
@@ -15,7 +16,7 @@ This process is part of an initial setup to assign these documents to specific i
 THe goal is to take the document files and do the following:
 - categorize them into document categories.
 - assign them to specific item(s) in the excel files.
-- produce a final excel file listing all of this information.
+- write the assignments back into annotated copies of the customer's excel files.
 
 # General Instructions
 
@@ -49,8 +50,9 @@ Do the following in sequence:
   - never read the document files on your own decision
   - maintain the list of documents according to the "### Keeping track of documents" section
 2. write to the user a sample of the file names in a list format (no more than 10) + a total count of the files, suggest the user to verify and proceed to next step
-3. prompt the user for excel files to match the documents with -> the user should provide specific excel files.
-4. write to the user a sample of the file names in a list format (no more than 10) + a total count of the files, suggest the user to verify and proceed to next step
+3. prompt the user for the upload manifest json file (see "### The upload manifest"). Store it at `.workflow/active/${sessionId}/UPLOAD_MANIFEST.json`.
+4. prompt the user for excel files to match the documents with -> the user should provide specific excel files.
+5. write to the user a sample of the file names in a list format (no more than 10) + a total count of the files, suggest the user to verify and proceed to next step
 
 # Step 2
 
@@ -74,8 +76,9 @@ Execute the plan described on "${CLAUDE_PLUGIN_ROOT}/skills/assign-documents/wor
 
 # Step 5
 
-Place the output excel file in an appropriate location close to the user provided files.
-Inform the user the task is completed and inform where the output excel file is located.
+The workflow (Step 4) writes an annotated copy of each customer excel file, named
+`<original>_with_documents.xlsx`, next to the original.
+Inform the user the task is completed and list where each annotated file is located.
 
 ### Keeping track of documents
 
@@ -97,3 +100,29 @@ where:
   - DOCUMENT_FILE_PATH: path to the document file
 
 Store the file on: .workflow/active/${sessionId}/DOCUMENT_FILES.json
+
+### The upload manifest
+
+Before this skill runs, the user uploads the documents to the customer's app and exports a manifest
+describing that upload. The user provides this file; store it verbatim at
+`.workflow/active/${sessionId}/UPLOAD_MANIFEST.json`. Its shape is:
+
+```json
+{
+  "documents": [
+    {
+      "fileName": "<DOCUMENT_FILE_NAME>",
+      "storageKey": "<APP_STORAGE_KEY>",
+      "sha": "<DOCUMENT_FILE_SHA_VALUE>"
+    }
+  ]
+}
+```
+
+where:
+  - fileName: the document's file name (basename)
+  - storageKey: the key/id of the uploaded file in the customer's app (Supabase)
+  - sha: SHA-256 of the document file
+
+Manifest entries are joined to the local documents (and to assignment results) by `sha`, so the same
+SHA-256 you record in `DOCUMENT_FILES.json` links each document to its `storageKey`.

@@ -1,13 +1,18 @@
 ## TASK OBJECTIVE
 
-Generate a json file containing all of the relevant data of each excel file as described on "### Phase 1"
+Match each document to the item(s) it references and categorize it, then write the assignments back
+into annotated copies of the customer's Excel files (one `<original>_with_documents.xlsx` per file).
 
 ## SESSION PATHS
 Input:
   - EXCEL_FILES_ITEMS: .workflow/active/${sessionId}/EXCEL_FILES_ITEMS.md
   - DOCUMENT_FILES: .workflow/active/${sessionId}/DOCUMENT_FILES.json
+  - UPLOAD_MANIFEST: .workflow/active/${sessionId}/UPLOAD_MANIFEST.json
+    (the user-provided manifest of documents already uploaded to the customer's app;
+     shape: `{ "documents": [ { "fileName": string, "storageKey": string, "sha": string } ] }`)
 Outputs:
-  - ASSIGNED_DOCUMENTS: .workflow/active/${sessionId}/ASSIGNED_DOCUMENTS.xlsx
+  - For each provided customer Excel file, an annotated copy named `<original>_with_documents.xlsx`
+    written next to the original (see Step 5). No standalone report file is produced.
 
 
 ## INSTRUCTIONS
@@ -49,9 +54,13 @@ Take all excel files mentioned in EXCEL_FILES_ITEMS.md and generate a json file 
 where:
   - EXCEL_FILE_SHA_VALUE: SHA-256 value of the excel file
   - EXCEL_FILE_PATH: path to the excel file
-  - EXCEL_REF: reference to the row in the excel file, formatted as such: `${TAB_KEY}::${ROW_NUMBER}`
+  - EXCEL_REF: reference to the row in the excel file, formatted as `${EXCEL_SHA}::${TAB_KEY}::${ROW_NUMBER}`
+    where EXCEL_SHA is the file's SHA-256 and ROW_NUMBER is the 1-based worksheet row number.
+    The SHA prefix makes the ref globally unique across files (two files can share a tab name and
+    row number), so Step 5 can route each edit back to the exact file/tab/row. TAB_KEY must not
+    contain "::". Sub-agents echo this ref verbatim — their task is unchanged.
   - COLUMN_KEY: key of each excel column, one key on the object per column
-  - COLUMN_KEY: value of the excel column
+  - COLUMN_VALUE: value of the excel column
 
 Store the file on: .workflow/active/${sessionId}/EXCEL_FILES_DATA.json
 
@@ -205,30 +214,129 @@ return {
 - If `unprocessed` is non-empty, tell the user which documents could not be matched after retries.
   These are carried into the output (Step 5), never silently dropped.
 
-# Step 5
+# Step 5 — annotate and write the customer Excel files
 
-Generate an excel file with **one row per document–item pair**, iterating the **authoritative**
-`DOCUMENT_FILES.json` list joined to the workflow results by `doc_path` (never iterate only what
-the agents returned). A document that matched N items produces N rows (the document/category
-columns repeat, the Excel-side columns differ per matched item). A document with an empty
-`row_refs` (no match, including any `unprocessed` documents) produces exactly **one** row with the
-Excel-side columns left blank — so every document is represented even when it matched nothing. For
-each matched `row_ref`, look up the row in `EXCEL_FILES_DATA.json` to fill the Excel-side columns.
-Columns:
+The deliverable is **not** a standalone report. Instead, produce an annotated copy of each customer
+Excel file the user provided, carrying the assignment data back into the file itself.
 
-- "Document File" -> file name of the document (from `doc_path`)
-- "Category Name" -> `category` of the document
-- "Is New Category" -> "YES" if `is_new_category` is true, otherwise "NO"
-- "Matched Item" -> primary column value of the matched item (prefer the item's name if available); blank when the document matched no item
-- "Matched Excel File" -> file name of the excel file the matched row belongs to; blank when no match
-- "excel_row_ref" -> the row's `ref` value for this pair; blank when no match
-- "excel_path" -> file path of the matched row's excel file; blank when no match
-- "excel_sha" -> SHA value of that excel file; blank when no match
-- "doc_path" -> file path of the document file
-- "doc_sha" -> SHA value of the document file (from `DOCUMENT_FILES.json`)
+Inputs available to you (the main agent) at this point:
+- the workflow return value: `results` — one object per document `{ doc_path, row_refs[], category, is_new_category }`
+- `UPLOAD_MANIFEST.json` — `{ "documents": [ { fileName, storageKey, sha } ] }`
+- `DOCUMENT_FILES.json` — `{ SHA, path }` per document
+- `EXCEL_FILES_DATA.json` — file/tab/row data, whose `rows[].ref` is `${EXCEL_SHA}::${TAB_KEY}::${ROW_NUMBER}`
+- `EXCEL_FILES_ITEMS.md` — which tabs/columns identify items, and which columns are human-readable
 
-Coverage check: every document in `DOCUMENT_FILES.json` must appear in at least one row. The total
-row count equals the sum of `max(1, row_refs.length)` across all documents. Documents flagged
-`unprocessed` still get their single blank-match row, never dropped.
+## 5.1 — Join each document to its upload manifest entry
 
-Place the file on ".workflow/active/${sessionId}/ASSIGNED_DOCUMENTS.xlsx"
+For each document in `results`, take its `SHA` from `DOCUMENT_FILES.json` (join by `path`), then find
+the `UPLOAD_MANIFEST.json` entry with the same `sha` — that yields `fileName` and `storageKey`. Use
+`fileName` only as a sanity check (warn on a basename mismatch). If a matched document has no
+manifest entry, warn the user and omit it from the JSON column (still list its name in the
+human-readable column). Join on `sha`, not filename — filenames may collide.
+
+## 5.2 — Deterministic category → documentTemplateId map
+
+Collect the set of categories that actually appear in `results` (exclude `"NONE"`; include any new
+categories agents created). For each category name compute a stable id:
+
+```
+documentTemplateId = "dt_" + sha256(name.strip().lower()).hexdigest()[:12]
+```
+
+This makes the same category resolve to the same id across every file and across re-runs. Exception:
+if a file already has a `Document Templates` tab containing a name, **reuse that tab's existing id**
+for that name rather than the computed one.
+
+## 5.3 — Invert assignments to per-(file, tab, row)
+
+For each result, for each `ref` in `row_refs`, split on `"::"` into `(excel_sha, tab_key, row_number)`.
+Group into `editsByFile[excel_sha][tab_key][row_number] = [ {fileName, storageKey, sha, category, documentTemplateId} ]`.
+Resolve `excel_sha` → the file's `path` via `EXCEL_FILES_DATA.json`. Documents with empty `row_refs`
+(including `unprocessed`) contribute no edits — they simply don't annotate any row.
+
+## 5.4 — Write each annotated file
+
+For every customer Excel file, copy it to `<original>_with_documents.xlsx` **next to the original**,
+then edit the copy:
+
+1. **`Document Templates` tab** (columns `Name`, `id`): create it if absent; if present, append the
+   assigned categories that aren't already listed (dedupe by `Name`, case-insensitive) — never
+   remove or reorder existing rows.
+2. For each item tab that has edits, add two columns (headers on the same header row Step 3 used):
+   - **`Matched Documents`** — human-readable. **Insert** it next to the item's human-readable
+     identifier column(s) (per `EXCEL_FILES_ITEMS.md`), in a sensible place. Value: the matched file
+     names grouped by category, one line per category, e.g. `Certificate of Analysis (CoA): a.pdf, b.pdf`.
+   - **`alreadyUploadedToSupabaseMatchedDocuments`** — machine-readable, appended as the **last**
+     column. Value: a JSON string mirroring the manifest shape, holding that row's matched docs:
+     `{"documents":[{"fileName":…,"storageKey":…,"sha":…,"documentTemplateId":…}, …]}`.
+   - Only matched rows get values; leave the columns blank on all other rows.
+
+Apply the edits with a script (below) rather than by hand — `openpyxl` preserves the workbook's other
+tabs and data. Be careful: inserting a column mid-sheet shifts later columns; verify formulas,
+merged cells, and styling on a sample file before trusting the result on the customer's real files.
+
+```python
+import json, hashlib, shutil, openpyxl
+
+def template_id(name):
+    return "dt_" + hashlib.sha256(name.strip().lower().encode()).hexdigest()[:12]
+
+def col_index_by_header(ws, header_row, header):
+    for c in range(1, ws.max_column + 1):
+        if str(ws.cell(header_row, c).value).strip() == header:
+            return c
+    return None
+
+def upsert_document_templates(wb, categories):
+    ws = wb["Document Templates"] if "Document Templates" in wb.sheetnames else None
+    if ws is None:
+        ws = wb.create_sheet("Document Templates")
+        ws.cell(1, 1, "Name"); ws.cell(1, 2, "id")
+        existing = {}
+        next_row = 2
+    else:
+        name_c = col_index_by_header(ws, 1, "Name") or 1
+        id_c = col_index_by_header(ws, 1, "id") or 2
+        existing = {str(ws.cell(r, name_c).value).strip().lower(): ws.cell(r, id_c).value
+                    for r in range(2, ws.max_row + 1) if ws.cell(r, name_c).value}
+        next_row = ws.max_row + 1
+    for name in categories:
+        if name.strip().lower() in existing:
+            continue
+        ws.cell(next_row, 1, name); ws.cell(next_row, 2, template_id(name))
+        existing[name.strip().lower()] = template_id(name)
+        next_row += 1
+    return existing  # name(lower) -> id, authoritative for this file
+
+# `plan` is what you build in 5.1–5.3, per file:
+# {
+#   "src": ..., "dst": ...,
+#   "categories": [names...],                       # assigned categories (for the templates tab)
+#   "tabs": [{
+#       "tab": "products", "header_row": 1,
+#       "human_before_header": "<existing header to insert Matched Documents before>",
+#       "rows": [{"row": 7, "human": "...", "docs": [ {fileName, storageKey, sha, category} ]}]
+#   }]
+# }
+def apply(plan):
+    shutil.copyfile(plan["src"], plan["dst"])
+    wb = openpyxl.load_workbook(plan["dst"])
+    ids = upsert_document_templates(wb, plan["categories"])
+    for t in plan["tabs"]:
+        ws = wb[t["tab"]]; hr = t["header_row"]
+        before = col_index_by_header(ws, hr, t["human_before_header"]) or (ws.max_column + 1)
+        ws.insert_cols(before); ws.cell(hr, before, "Matched Documents")
+        json_c = ws.max_column + 1; ws.cell(hr, json_c, "alreadyUploadedToSupabaseMatchedDocuments")
+        for r in t["rows"]:
+            ws.cell(r["row"], before, r["human"])
+            docs = [{"fileName": d["fileName"], "storageKey": d["storageKey"], "sha": d["sha"],
+                     "documentTemplateId": ids[d["category"].strip().lower()]}
+                    for d in r["docs"] if d["category"].strip().lower() in ids]
+            ws.cell(r["row"], json_c, json.dumps({"documents": docs}, ensure_ascii=False))
+    wb.save(plan["dst"])
+```
+
+## 5.5 — Report
+
+Tell the user the task is complete and list each `<original>_with_documents.xlsx` path. Surface any
+documents that were `unprocessed` or had no manifest entry.
