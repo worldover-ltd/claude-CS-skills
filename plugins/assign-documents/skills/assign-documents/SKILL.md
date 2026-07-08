@@ -128,3 +128,17 @@ where:
 
 Manifest entries are joined to the local documents (and to assignment results) by `sha`, so the same
 SHA-256 you record in `DOCUMENT_FILES.json` links each document to its `storageKey`.
+
+### Helping the User
+
+The user might require your help on the actions that the user needs to do himself, some examples:
+- actions on the Worldmaker app: uploading the documents to the customer's app, downloading the uploaded documents manifest, etc...
+- actions on his computer: organizing all of the files in a folder, where to get your generated files, etc...
+- actions related to claude: linking files/folders to you
+
+Offer help to the user proactively or when the user asks for it.
+
+Use the link below when assisting the user, its a Notion page that contains a tutorial:
+https://app.notion.com/p/worldover/Worldmaker-Upload-Documents-39619f2640b280bab6f6d981f3172118?source=copy_link
+
+If you cannot access the page let the user know and ask for it to be fixed by one of the colleagues on the Engineering team.
