@@ -139,6 +139,6 @@ The user might require your help on the actions that the user needs to do himsel
 Offer help to the user proactively or when the user asks for it.
 
 Use the link below when assisting the user, its a Notion page that contains a tutorial:
-https://app.notion.com/p/worldover/Worldmaker-Upload-Documents-39619f2640b280bab6f6d981f3172118?source=copy_link
+https://worldover.notion.site/Worldmaker-Upload-Documents-39619f2640b280bab6f6d981f3172118
 
 If you cannot access the page let the user know and ask for it to be fixed by one of the colleagues on the Engineering team.
