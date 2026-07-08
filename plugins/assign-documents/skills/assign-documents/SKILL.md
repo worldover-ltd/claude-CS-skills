@@ -1,7 +1,7 @@
 ---
 name: assign-documents
 description: "Skill to categorize documents and assigning them to items present on a source of excel files. Triggers on \"assign-documents\" or when user asks to categorize/match/assign documents to some type of items or sheet file(s), or if the user wants to prepare some documents for uploading/migrating."
-allowed-tools: Skill, Agent, AskUserQuestion, TodoWrite, Read, Write, Edit, Bash, Glob, Grep
+allowed-tools: Skill, Agent, AskUserQuestion, TodoWrite, Read, Write, Edit, Bash, Glob, Grep, WebFetch
 ---
 
 ### Context
