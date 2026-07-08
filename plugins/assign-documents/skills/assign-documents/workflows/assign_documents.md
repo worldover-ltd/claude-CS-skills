@@ -216,8 +216,7 @@ return {
 
 # Step 5 — annotate and write the customer Excel files
 
-The deliverable is **not** a standalone report. Instead, produce an annotated copy of each customer
-Excel file the user provided, carrying the assignment data back into the file itself.
+Produce an annotated copy of each excel file the user provided, carrying the assignment data back into the file itself.
 
 Inputs available to you (the main agent) at this point:
 - the workflow return value: `results` — one object per document `{ doc_path, row_refs[], category, is_new_category }`
@@ -256,7 +255,7 @@ Resolve `excel_sha` → the file's `path` via `EXCEL_FILES_DATA.json`. Documents
 
 ## 5.4 — Write each annotated file
 
-For every customer Excel file, copy it to `<original>_with_documents.xlsx` **next to the original**,
+For every customer excel file, copy it to `<original>_with_documents.xlsx` **next to the original**,
 then edit the copy:
 
 1. **`Document Templates` tab** (columns `Name`, `id`): create it if absent; if present, append the

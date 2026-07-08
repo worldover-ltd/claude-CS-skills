@@ -8,6 +8,7 @@ allowed-tools: Skill, Agent, AskUserQuestion, TodoWrite, Read, Write, Edit, Bash
 
 The user will provide document files related to products, raw materials or other items related to the area of cosmetics, chemicals and other substance-based industries.
 The user will provide excel files, these contain migration data for a specific customer.
+The user will provide a document upload manifest json, this file lists the document files already uploaded to the customer's app.
 Before running this skill the user has already uploaded the documents to the customer's app, and provides an upload manifest json describing that upload (see "### The upload manifest").
 This process is part of an initial setup to assign these documents to specific items on the customer's excel files, later on the user will migrate this data and the documents to the customer's app.
 
@@ -16,13 +17,14 @@ This process is part of an initial setup to assign these documents to specific i
 THe goal is to take the document files and do the following:
 - categorize them into document categories.
 - assign them to specific item(s) in the excel files.
-- write the assignments back into annotated copies of the customer's excel files.
+- write the assignments into annotated copies of the customer's excel files.
 
 # General Instructions
 
 - Follow the instructions in "${CLAUDE_PLUGIN_ROOT}/skills/assign-documents/specs/MAIN_AGENT_PROMPT.md"
 - Refer to the documents as the "customer's documents".
 - Refer to the excel files as the "customer's data sheet" files.
+- Refer to the document upload manifest json as the "document upload manifest" file.
 
 ### Session setup
 
@@ -50,7 +52,7 @@ Do the following in sequence:
   - never read the document files on your own decision
   - maintain the list of documents according to the "### Keeping track of documents" section
 2. write to the user a sample of the file names in a list format (no more than 10) + a total count of the files, suggest the user to verify and proceed to next step
-3. prompt the user for the upload manifest json file (see "### The upload manifest"). Store it at `.workflow/active/${sessionId}/UPLOAD_MANIFEST.json`.
+3. prompt the user for the upload manifest json file.
 4. prompt the user for excel files to match the documents with -> the user should provide specific excel files.
 5. write to the user a sample of the file names in a list format (no more than 10) + a total count of the files, suggest the user to verify and proceed to next step
 
@@ -120,7 +122,7 @@ describing that upload. The user provides this file; store it verbatim at
 ```
 
 where:
-  - fileName: the document's file name (basename)
+  - fileName: the document's file name
   - storageKey: the key/id of the uploaded file in the customer's app (Supabase)
   - sha: SHA-256 of the document file
 
