@@ -35,6 +35,26 @@ or "match these documents to items in this spreadsheet".
 Intermediate and output files are written under `.workflow/active/<sessionId>/` in your
 current working directory.
 
+### `generate-workbook`
+
+**Work in progress.** Build the upload workbook for a Worldmaker app when the customer didn't supply
+one, out of whatever they did send — zips, spreadsheets, Word documents, PDFs, exports.
+
+Invoke it by running `/generate-workbook`, or ask Claude to "build a workbook from these files".
+
+**What it does**
+
+1. Collects the source files (with your confirmation) and reads every one of them.
+2. Runs a grilling session to agree the *entity model* with you: which items get uploaded, which
+   field identifies each one, what data each carries, and how they relate.
+3. Publishes an artifact — an ER diagram plus a preview of every sheet with real sample rows — and
+   iterates on it until you approve.
+4. Writes `WORKBOOK.xlsx` in tidy-data layout: one sheet per item, one row per instance, link sheets
+   for many-to-many, a `README` sheet explaining the rest.
+
+Intermediate and output files are written under `.workflow/active/<sessionId>/` in your current
+working directory.
+
 ## Repo layout
 
 ```
@@ -43,6 +63,9 @@ plugins/
   assign-documents/
     .claude-plugin/plugin.json       # plugin manifest
     skills/assign-documents/         # the skill itself (SKILL.md + supporting files)
+  generate-workbook/
+    .claude-plugin/plugin.json
+    skills/generate-workbook/         # SKILL.md + references/
 ```
 
 ## License

@@ -15,6 +15,13 @@
       "description": "Categorize documents and assign them to items in a source of Excel files, then produce a consolidated Excel report.",
       "category": "productivity",
       "keywords": ["documents", "excel", "categorization", "cosmetics", "regulatory", "compliance"]
+    },
+    {
+      "name": "generate-workbook",
+      "source": "./plugins/generate-workbook",
+      "description": "Work in progress. Build the upload workbook for a Worldmaker app out of raw customer source files when the customer did not supply one.",
+      "category": "productivity",
+      "keywords": ["excel", "workbook", "migration", "upload", "wip"]
     }
   ]
 }
