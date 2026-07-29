@@ -1,6 +1,11 @@
 # Runtime session artifacts produced when running skills
 .workflow/
 
+# Python bytecode from running the skills' helper scripts
+__pycache__/
+*.pyc
+
 # OS / editor cruft
 .DS_Store
 *.swp
+Thumbs.db

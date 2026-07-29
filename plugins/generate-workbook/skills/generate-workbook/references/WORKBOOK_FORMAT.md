@@ -6,18 +6,22 @@ instance, one column per field, one value per cell.
 
 ## Sheets
 
-- One sheet per item in the entity model, named for the item in plural lower snake case:
-  `products`, `raw_materials`, `formulations`, `ingredients`, `documents`.
-- A `README` sheet first, before the data sheets. One row per data sheet with: sheet name, what item
-  it holds, which column is the identifier, which columns point at other sheets, and which source
-  files it came from. Anything you decided during the grilling that a reader would otherwise have to
-  guess belongs here.
+- One sheet per item in the mapping, **named for the app table it feeds**: `products`,
+  `raw_materials`, `formulations`, `documents`. The app agent reads this file against its own schema,
+  so matching its names is what saves it from guessing.
+- A `README` sheet first, before the data sheets. One row per data sheet with: sheet name, which app
+  entity it feeds, which column is the identifier, which columns point at other sheets, and which
+  source files it came from. Anything you decided during the grilling that a reader would otherwise
+  have to guess belongs here — above all, which columns the app has no home for yet and will need as
+  custom fields.
 - Data starts at cell `A1` with the header row, values from row 2 down. No title banner, no logo
   row, no merged cells, no blank spacer rows or columns.
 
 ## Columns
 
-- Header names in lower snake case, no spaces, no units, no line breaks: `trade_name`, `cas_number`.
+- Header names match the app column the field feeds, exactly as `APP_SCHEMA.json` spells it. For a
+  field the app has no column for, lower snake case, no spaces, no units, no line breaks:
+  `trade_name`, `cas_number`.
 - The identifier column comes first and is named `id`. When the item had no unique field in the
   source, generate one with a readable prefix — `PROD-001`, `RM-014` — and say so in `README`.
 - Units live in the header, not the cell: `weight_kg` holding `12`, rather than `weight` holding
@@ -47,15 +51,13 @@ who has to check it.
 
 ## Writing it
 
-Write the file with a script rather than cell by cell, so a correction is a re-run.
+Write the file with `openpyxl`, under whichever interpreter the preflight step resolved. Keep the
+script at `.workflow/active/${sessionId}/build_workbook.py` and generate the workbook by running it,
+rather than writing cells one at a time — a correction then costs a re-run.
 
-Confirm the writer works before generating anything, because a missing library surfaces as a broken
-run at the last step:
+The script has to run wherever the user is, so build paths with `pathlib` rather than joining strings,
+and pass `encoding="utf-8"` on every text file you open — the default differs by platform and
+silently mangles accented ingredient names on Windows.
 
-- `python -c "import openpyxl"` — the default, and what the sibling `assign-documents` skill uses.
-- On Windows, `python` is often the Microsoft Store stub that only prints an install prompt. Treat
-  any "Python was not found" output as no Python at all.
-- Fallback: Node with `exceljs`, which covers freeze panes, autofilter and widths equally.
-
-Whichever you use, install into the session directory and keep the script at
-`.workflow/active/${sessionId}/build_workbook.py` (or `.js`) so the run can be repeated.
+Before handing over, load the file back and check what you wrote: every sheet present, every
+cross-sheet id resolving, row counts matching what the mapping said to expect.

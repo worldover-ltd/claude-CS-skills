@@ -44,13 +44,19 @@ Invoke it by running `/generate-workbook`, or ask Claude to "build a workbook fr
 
 **What it does**
 
-1. Collects the source files (with your confirmation) and reads every one of them.
-2. Runs a grilling session to agree the *entity model* with you: which items get uploaded, which
-   field identifies each one, what data each carries, and how they relate.
-3. Publishes an artifact — an ER diagram plus a preview of every sheet with real sample rows — and
+1. Checks it can reach `python3` and the `WorldoverProd` repos, and stops early if it can't.
+2. Asks which customer and which app, resolves that to the app's repo, and reads the *app schema*
+   out of it — the entities the app holds and how they relate.
+3. Collects the customer's source files (with your confirmation) and reads every one of them.
+4. Runs a grilling session to agree the *mapping* with you: which app entity each pile of data feeds,
+   what identifies each item, which app field each column fills, and what has no home in the app yet.
+5. Publishes an artifact — an ER diagram plus a preview of every sheet with real sample rows — and
    iterates on it until you approve.
-4. Writes `WORKBOOK.xlsx` in tidy-data layout: one sheet per item, one row per instance, link sheets
-   for many-to-many, a `README` sheet explaining the rest.
+6. Writes `WORKBOOK.xlsx` in tidy-data layout, with sheets and headers named after the app's own
+   tables and columns so its agent doesn't have to guess.
+
+Needs Python with `openpyxl`, and `gh` authenticated against the `WorldoverProd` organisation. Runs on
+macOS, Linux and Windows.
 
 Intermediate and output files are written under `.workflow/active/<sessionId>/` in your current
 working directory.
@@ -65,7 +71,7 @@ plugins/
     skills/assign-documents/         # the skill itself (SKILL.md + supporting files)
   generate-workbook/
     .claude-plugin/plugin.json
-    skills/generate-workbook/         # SKILL.md + references/
+    skills/generate-workbook/         # SKILL.md + references/ + lib/
 ```
 
 ## License

@@ -29,26 +29,83 @@ Files inside this skill are referenced with `${CLAUDE_PLUGIN_ROOT}`, set by Clau
 plugin is installed. Running from a raw checkout instead, treat it as the plugin root — the folder
 containing this `skills/` directory.
 
-### The entity model
+Write every path with forward slashes and quote any that could contain a space, so the same command
+works on macOS, Linux and Windows.
 
-Every sheet, column and row in the finished workbook comes from the **entity model**: the items to
-upload and how they connect. Hold it at `.workflow/active/${sessionId}/ENTITY_MODEL.md` and update
-it as each answer lands, so the file is always what you would show the user right now.
+### The app schema
 
-The entity model is complete when all four hold for **every** item:
+The Worldmaker app the data lands in already has a fixed set of concepts, and **its repo is the
+truth about them**. The app's own word for them is **entities** — in a PLM app: Product, Component,
+Raw Material, Formulation. Reading them before opening the customer's files is what turns a vague
+"what is in these files" into a specific "which of this app's entities does this file feed".
 
-- **name** — what the item is (products, raw materials, formulations, ingredients, documents, …).
-- **identifier** — the field whose value is unique for one item ("id", "primary identifier", "code",
-  "SKU"), or a recorded decision that the item has none and the workbook will carry a generated one.
-- **fields** — every piece of data to upload for that item, each traced to the source file and
-  location it was read from.
-- **relationships** — every link to another item, with cardinality in both directions. A product has
-  many formulations; a formulation belongs to many products; a raw material has at most one
+Hold the app schema at `.workflow/active/${sessionId}/APP_SCHEMA.md`, one entry per entity:
+
+- **name** — the entity, and the table backing it.
+- **what it is** — one sentence of business language, the way you would explain it to the user.
+- **fields** — the columns the app stores for it, and which of them the app requires.
+- **relationships** — which other entities it links to, and in which direction.
+
+### The mapping
+
+The **mapping** is the customer's data expressed in the app's entities — the bridge from source
+files to workbook, and the thing the user actually approves. Hold it at
+`.workflow/active/${sessionId}/MAPPING.md` and update it as each answer lands, so the file is always
+what you would show the user right now.
+
+The mapping is complete when all four hold for **every** item the customer has data for:
+
+- **target entity** — the app schema entity this data feeds.
+- **identifier** — the source field whose value is unique per item ("id", "primary identifier",
+  "code", "SKU"), or a recorded decision that it has none and the workbook will carry a generated one.
+- **fields** — every piece of data to upload, each traced to the source file it was read from, and
+  each naming the app field it feeds. A field with no home in the app schema is recorded as one the
+  app will need to hold as a custom field — flag it, rather than dropping it.
+- **relationships** — every link to another item, with cardinality in both directions, checked
+  against what the app schema allows. A product has many formulations; a raw material has at most one
   formulation; a formulation holds ingredients, raw materials, or other formulations.
 
 ### Process
 
-# Step 1 — collect the source files
+# Step 1 — preflight
+
+The user may be on macOS, Linux or Windows, so resolve two capabilities here rather than assuming
+them. Both fail unrecoverably if discovered late.
+
+**Python.** Find this system's interpreter by trying, in order, `python3`, `python`, then `py -3`,
+until one runs `-c "import openpyxl"` cleanly. Use that same name for every later command in the run.
+When the interpreter runs but `openpyxl` is missing, `<interpreter> -m pip install openpyxl` is worth
+one attempt before treating it as unavailable.
+
+**GitHub.** `gh repo list WorldoverProd --limit 1` returns a repo.
+
+If either has no working answer, stop here and tell the user which one, and that someone on the
+engineering team can set it up — access to the `WorldoverProd` GitHub organisation, or a Python with
+`openpyxl`. Wait for them to come back with it.
+
+Done when both are confirmed and the working interpreter name is recorded.
+
+# Step 2 — find the customer's app
+
+Ask the user for the customer's name and the app's name. Repos live at
+`https://github.com/WorldoverProd`, named `<customer>-<app>`.
+
+Follow `${CLAUDE_PLUGIN_ROOT}/skills/generate-workbook/references/READING_APP_SCHEMA.md` to resolve
+the pair to one repo. Customers often have several apps, so name the repo you settled on and have the
+user confirm it before reading anything.
+
+Done when the user confirms one repo.
+
+# Step 3 — learn what the app holds
+
+Build the **app schema** from that repo, per the same reference file.
+
+Then write it back to the user as a short list — entity, one sentence, what it links to — so they can
+correct you before it drives the rest of the run.
+
+Done when every entity in `APP_SCHEMA.md` carries all four parts, and the user has seen the list.
+
+# Step 4 — collect the source files
 
 Ask the user for the files to build the workbook from, and wait for them to name specific files or a
 folder. Then write back a sample of the file names (10 at most) in a list, plus the total count, and
@@ -56,59 +113,61 @@ ask the user to check it.
 
 Done when the user confirms the list.
 
-# Step 2 — read what is in them
+# Step 5 — read what is in them
 
 Read every source file and note what each one holds: item names, headers, tab names, row counts,
-which fields look unique. Follow
+which fields look unique, and which app entity it appears to feed. Follow
 `${CLAUDE_PLUGIN_ROOT}/skills/generate-workbook/references/EXTRACTING_SOURCES.md` for zips, Excel
 files, Word documents, PDFs and scans.
 
 Done when every source file is either read or reported to the user as unreadable with the reason.
 
-# Step 3 — grill out the entity model
+# Step 6 — grill out the mapping
 
-Invoke the `grilling` skill and interview the user until the **entity model** is complete on all four
+Invoke the `grilling` skill and interview the user until the **mapping** is complete on all four
 counts above.
 
-Look facts up in the source files yourself and bring them as your recommended answer — "this column
-has 412 distinct values across 412 rows, so it looks like the unique code; confirm?" beats asking the
-user what the unique code is. The decisions are theirs; the digging is yours.
+Look facts up in the source files and the app schema yourself, and bring them as your recommended
+answer — "this column has 412 distinct values across 412 rows and the app stores a `code` on raw
+materials, so I read it as the raw material code; confirm?" beats asking the user what the unique
+code is. The decisions are theirs; the digging is yours.
 
 Between questions, show the shape so far as a small markdown table per item — those render in the
 user's terminal where a diagram does not.
 
-Done when the completion test in "### The entity model" holds for every item, with no field left
-untraced and no relationship left with an open end.
+Done when the completion test in "### The mapping" holds for every item, with no field left untraced,
+no relationship left with an open end, and every app entity the customer has data for accounted for.
 
-# Step 4 — show the workbook before building it
+# Step 7 — show the workbook before building it
 
 Load the `artifact-design` skill, then publish one artifact to
-`.workflow/active/${sessionId}/entity_model.html` holding, in this order:
+`.workflow/active/${sessionId}/mapping.html` holding, in this order:
 
 1. A mermaid ER diagram of the items and their relationships.
-2. One card per item: its identifier, its fields, what it links to.
+2. One card per item: its target entity, its identifier, its fields, what it links to, and any field
+   the app has no home for.
 3. A preview of each sheet the workbook will have — real header row, and three to five sample rows
    taken from the actual source data.
 
 The sheet preview is what the user can judge, so fill it with real values rather than placeholders.
 
-Iterate: take their corrections, update `ENTITY_MODEL.md`, republish to the same file path so the URL
+Iterate: take their corrections, update `MAPPING.md`, republish to the same file path so the URL
 holds. Done when the user approves what the artifact shows.
 
-# Step 5 — write the workbook
+# Step 8 — write the workbook
 
 Build the Excel file per
 `${CLAUDE_PLUGIN_ROOT}/skills/generate-workbook/references/WORKBOOK_FORMAT.md`, writing to
 `.workflow/active/${sessionId}/WORKBOOK.xlsx`.
 
-Done when every item in the entity model has its sheet, every relationship is carried by a real
-column or link sheet, and every row traces back to a source file.
+Done when every item in the mapping has its sheet, every relationship is carried by a real column or
+link sheet, and every row traces back to a source file.
 
-# Step 6 — hand it over
+# Step 9 — hand it over
 
-Give the user the full path to `WORKBOOK.xlsx`, one line per sheet saying what is in it, and the two
-or three things worth spot-checking before they feed it to the app agent — the ones you had least
-evidence for.
+Give the user the full path to `WORKBOOK.xlsx`, one line per sheet saying which app entity it feeds,
+and the two or three things worth spot-checking before they give it to the app agent — the ones you
+had least evidence for.
 
 ### Helping the user
 

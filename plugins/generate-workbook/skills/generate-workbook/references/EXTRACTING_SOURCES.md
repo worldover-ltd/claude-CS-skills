@@ -12,6 +12,16 @@ with the file path so a field can be traced back to it later.
 each file inside as its own source. Archives nest — expand what you find inside too. Note the folder
 structure itself: customers often encode the item a document belongs to in its folder name.
 
+For `.zip`, the Python resolved in the preflight step handles it on every platform, where `unzip` and
+`tar` are not always present:
+
+```sh
+<interpreter> -m zipfile -e "<archive.zip>" ".workflow/active/${sessionId}/extracted/<name>"
+```
+
+Other archive formats need a tool that may not be installed. Check before relying on one, and if none
+is available, ask the user to expand it themselves and point you at the folder.
+
 ## Spreadsheets
 
 `.xlsx`, `.xls`, `.csv`, `.tsv`: read **every** tab, not the first one. Per tab record the tab name,
