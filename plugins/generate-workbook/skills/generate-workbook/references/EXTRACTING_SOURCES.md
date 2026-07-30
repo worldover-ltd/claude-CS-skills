@@ -43,11 +43,26 @@ usually describe a single item, and the file name is often the identifier.
 
 ## PDFs and scans
 
-`.pdf`: use the `pdf` skill, which covers text, tables, and OCR for scanned pages. `.png`, `.jpg`,
-`.tiff`: read with the Read tool, which renders them visually.
+`.pdf` with a text layer: use the `pdf` skill for text and tables. `.png`, `.jpg`, `.tiff`: read with
+the Read tool, which renders them visually.
 
-For a scan, record what you could read and what you could not, and bring the unreadable parts to the
-user in Step 6 rather than inferring the values.
+A **scan** has no text layer — a photographed or faxed page wrapped in a PDF — so text extraction
+returns nothing and the values have to be read off the image. The `pdf` skill prescribes OCR through
+`pytesseract` and `pdf2image`, and both are wrappers around system binaries (`tesseract`, Poppler's
+`pdftoppm`) that need administrator rights. Where those are absent, render the page and read it
+yourself:
+
+```sh
+<interpreter> -c "import pypdfium2 as p; d=p.PdfDocument('<file.pdf>'); [d[i].render(scale=2).to_pil().save(f'<out>/page_{i+1}.png') for i in range(len(d))]"
+```
+
+`pypdfium2` needs no system binary and renders a page whatever its internal compression, so this route
+survives scans that OCR cannot reach at all. Read the resulting images with the Read tool. Confirm
+`pypdfium2` and `Pillow` import before relying on it — the preflight step covers the document skills'
+own requirements, not this fallback.
+
+Either way, record for each scan what you could read and what you could not, and bring the unreadable
+parts to the user in Step 6 rather than inferring the values.
 
 ## When a file type is not covered
 

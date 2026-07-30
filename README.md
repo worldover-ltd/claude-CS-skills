@@ -70,6 +70,10 @@ Anthropic's official [document skills](https://github.com/anthropics/skills) (`x
 if they aren't present, reads what each one declares it needs, then probes every tool for real. Missing
 tooling is reported as the file types it blocks, with a pointer to the engineering team.
 
+Each probe *exercises* the capability rather than importing it — a wrapper around a missing system binary
+imports cleanly and dies on first use, which is exactly the trap worth catching. Installing anything is
+put to you first, so a preflight never quietly rebuilds your Python.
+
 Runs its probing in a sub-agent and returns just the verdict, so the calling run's context stays clear.
 
 Invoke it by running `/verify-document-skills-requirements`. `generate-workbook` calls it in its

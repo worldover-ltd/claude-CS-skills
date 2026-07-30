@@ -88,21 +88,37 @@ dependency appears in the list with the skill that needs it.
 
 # Step 3 — probe every requirement
 
-Run a real check per row. A Python library is settled by importing it under the interpreter this
-system actually has (try `python3`, `python`, then `py -3`); an npm package by resolving it; a binary
-by invoking it for its version. Record pass or fail against each row.
+A probe **exercises** the capability. It does not load it and assume the rest.
 
-Where a probe fails, try once to install it when it is the kind of thing a package manager handles on
-its own — a Python library or an npm package. A system binary needs administrator rights the user does
-not have, so leave those for the engineering team and mark the row failed.
+The distinction is the whole point of this step, because the commonest failure passes an import and
+dies on first use: a wrapper library around a system binary installs cleanly, imports cleanly, and
+raises the moment it is asked to do anything, because the binary behind it was never there. Importing
+such a library proves only that the wrapper exists.
 
-That one attempt fails on some systems by design: a Linux or macOS Python installed by the operating
-system or a package manager refuses installs outright, saying the environment is externally managed.
-That is the row failing, not something to work around — getting past it needs a virtual environment or
-a different Python, which is engineering's call.
+So per row, run the smallest thing that would fail if the capability were absent — ask the tool for its
+version through the wrapper, convert a scratch file, render one page. A row settled by an import alone
+is unproven, and belongs in the report as such rather than as a pass.
 
-Done when every row in the list carries a pass or a fail from a command that ran, and each fail is
-marked as either fixed by that one install attempt or still missing.
+Where a probe fails, say so in the verdict. Installing the fix is a separate decision:
+
+- **A system binary** needs administrator rights the user does not have. Mark the row failed and leave
+  it to the engineering team.
+- **A Python library or npm package** could be installed here, so put it to the user first — name the
+  package, the file types it unblocks, and that it changes the Python or Node setup on their machine.
+  Install on a yes, into this system's own interpreter, and probe again. Install nothing globally with
+  npm.
+
+Asking costs one exchange and keeps a shared machine's environment the user's decision. A skill can
+declare a dozen dependencies, and a verify run that installs each one it finds has quietly rebuilt
+somebody's Python.
+
+Where the user says yes and the install is still refused as an externally-managed environment — the
+normal answer from a Linux or macOS Python that the operating system or a package manager put there —
+that is the row failing. Getting past it needs a virtual environment or a different Python, which is
+engineering's call.
+
+Done when every row carries a pass or a fail from a command that exercised the capability, no row rests
+on an import alone, and each fail is marked as declined, installed-and-passing, or still missing.
 
 # Step 4 — return the verdict
 
@@ -116,10 +132,18 @@ person. Return it in three parts:
 3. **Restart needed** — whether `document-skills` was installed during this run, since invoking those
    skills through the `Skill` tool needs Claude Code restarted.
 
+Where a skill's own documented route is dead but the capability is reachable another way, both facts
+belong in the verdict — the route that failed, and the one that works. A skill written for a managed
+environment can prescribe a tool chain that never installs on a laptop while a pure-library route sits
+right there, and the caller can only pick it up if the verdict names it.
+
+Anything the user declined is reported as blocked, alongside the offer they turned down, so a later run
+can raise it again rather than rediscovering it.
+
 A partial pass is a normal result, not a failure: the covered types are usable immediately, and the
 caller decides whether that is enough to continue.
 
-Where anything is blocked, the calling run tells the user — in the same plain terms — that installing
-it needs someone from the engineering team.
+Where anything is blocked on a system binary, the calling run tells the user — in the same plain terms
+— that installing it needs someone from the engineering team.
 
 Done when all three parts are present, and every probe that failed appears under a blocked file type.
