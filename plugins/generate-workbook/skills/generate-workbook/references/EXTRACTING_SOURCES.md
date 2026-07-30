@@ -24,27 +24,36 @@ is available, ask the user to expand it themselves and point you at the folder.
 
 ## Spreadsheets
 
-`.xlsx`, `.xls`, `.csv`, `.tsv`: read **every** tab, not the first one. Per tab record the tab name,
-the header row, the row count, and for each column its distinct-value count against the row count —
-a column whose distinct count equals the row count is a candidate identifier, which is the evidence
-Step 3 needs.
+`.xlsx`, `.xls`, `.csv`, `.tsv`: use the `xlsx` skill, whose own remit covers messy customer data —
+malformed rows, misplaced headers, junk columns.
+
+Read **every** tab, not the first one. Per tab record the tab name, the header row, the row count, and
+for each column its distinct-value count against the row count — a column whose distinct count equals
+the row count is a candidate identifier, which is the evidence Step 6 needs.
 
 Watch for headers that do not start at row 1, merged header cells spanning two rows, and repeated
 blocks of the same table stacked down one sheet.
 
 ## Documents
 
-`.docx`, `.doc`, `.rtf`, `.txt`, `.md`: read the text and note which items it names and any tables it
-holds. Specification and safety-data documents usually describe a single item, and the file name is
-often the identifier.
+`.docx`, `.dotx`: use the `docx` skill. `.doc`, `.rtf`, `.txt`, `.md`: read directly.
+
+Note which items the document names and any tables it holds. Specification and safety-data documents
+usually describe a single item, and the file name is often the identifier.
 
 ## PDFs and scans
 
-`.pdf`: read with the Read tool's `pages` parameter, 20 pages per request at most. `.png`, `.jpg`,
+`.pdf`: use the `pdf` skill, which covers text, tables, and OCR for scanned pages. `.png`, `.jpg`,
 `.tiff`: read with the Read tool, which renders them visually.
 
 For a scan, record what you could read and what you could not, and bring the unreadable parts to the
-user in Step 3 rather than inferring the values.
+user in Step 6 rather than inferring the values.
+
+## When a file type is not covered
+
+The preflight step records which document skills passed their probes. For a file type whose skill is
+unavailable, say so as you reach the file and ask the user to tell you what it contains, rather than
+guessing from the file name. Record it in the mapping as user-supplied.
 
 ## Anything else
 

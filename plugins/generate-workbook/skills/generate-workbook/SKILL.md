@@ -1,7 +1,7 @@
 ---
 name: generate-workbook
 description: "Build the upload workbook for a Worldmaker app when the customer did not supply one. Triggers on \"generate-workbook\", or when the user wants a workbook/spreadsheet built out of raw customer source files (zip, excel, docx, pdf, export) so an app agent can upload or migrate that data."
-allowed-tools: Skill, AskUserQuestion, TodoWrite, Read, Write, Edit, Bash, Glob, Grep, Artifact
+allowed-tools: Agent, Skill, AskUserQuestion, TodoWrite, Read, Write, Edit, Bash, Glob, Grep, Artifact
 ---
 
 ### Status
@@ -67,23 +67,36 @@ The mapping is complete when all four hold for **every** item the customer has d
 
 ### Process
 
-# Step 1 — preflight
+# Step 1 — preflight, in parallel
 
-The user may be on macOS, Linux or Windows, so resolve two capabilities here rather than assuming
-them. Both fail unrecoverably if discovered late.
+The user may be on macOS, Linux or Windows, so nothing here is assumed. Two independent questions, so
+send **both sub agents in a single message** and read their answers together. Each does a pile of
+probing whose output matters only until it reaches a verdict, and a sub agent keeps that out of this
+run's context.
 
-**Python.** Find this system's interpreter by trying, in order, `python3`, `python`, then `py -3`,
-until one runs `-c "import openpyxl"` cleanly. Use that same name for every later command in the run.
-When the interpreter runs but `openpyxl` is missing, `<interpreter> -m pip install openpyxl` is worth
-one attempt before treating it as unavailable.
+**Document tooling.** One sub agent invokes the `verify-document-skills-requirements` skill and returns
+its verdict. The customer's files arrive as spreadsheets, Word documents and PDFs, and Anthropic's
+official document skills are what read them in Step 5.
 
-**GitHub.** `gh repo list WorldoverProd --limit 1` returns a repo.
+**This run's own prerequisites.** A second sub agent settles two things and returns both:
 
-If either has no working answer, stop here and tell the user which one, and that someone on the
-engineering team can set it up — access to the `WorldoverProd` GitHub organisation, or a Python with
-`openpyxl`. Wait for them to come back with it.
+- The Python this system has — try `python3`, `python`, then `py -3`, taking the first that runs
+  `-c "import openpyxl"` cleanly. When the interpreter runs but the library is missing,
+  `<interpreter> -m pip install openpyxl` is worth one attempt. It returns the interpreter name, which
+  every later command in the run uses.
+- Whether `gh repo list WorldoverProd --limit 1` returns a repo, which is how Step 2 reaches the
+  customer's app.
 
-Done when both are confirmed and the working interpreter name is recorded.
+Read the two verdicts together:
+
+- **Python or repo access missing** — stop here. Tell the user which one, and that someone on the
+  engineering team can set it up: access to the `WorldoverProd` GitHub organisation, or a Python with
+  `openpyxl`. Wait for them to come back with it.
+- **Document tooling partial** — workable. Carry forward which file types are covered; the rest become
+  files the user describes to you in Step 5. Tell them which ones, and that engineering can fix it.
+
+Done when both sub agents have reported, the interpreter name is recorded, repo access is confirmed,
+and the covered file types are known.
 
 # Step 2 — find the customer's app
 

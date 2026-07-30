@@ -44,7 +44,9 @@ Invoke it by running `/generate-workbook`, or ask Claude to "build a workbook fr
 
 **What it does**
 
-1. Checks it can reach `python3` and the `WorldoverProd` repos, and stops early if it can't.
+1. Preflights everything the run needs, in two parallel sub-agents — the document tooling via
+   `verify-document-skills-requirements`, and its own prerequisites (a Python with `openpyxl`, plus `gh`
+   access to the `WorldoverProd` repos) — and stops early if the latter aren't there.
 2. Asks which customer and which app, resolves that to the app's repo, and reads the *app schema*
    out of it — the entities the app holds and how they relate.
 3. Collects the customer's source files (with your confirmation) and reads every one of them.
@@ -61,6 +63,21 @@ macOS, Linux and Windows.
 Intermediate and output files are written under `.workflow/active/<sessionId>/` in your current
 working directory.
 
+### `verify-document-skills-requirements`
+
+Checks this machine can actually read the customer's file types before a run depends on it. Installs
+Anthropic's official [document skills](https://github.com/anthropics/skills) (`xlsx`, `docx`, `pdf`)
+if they aren't present, reads what each one declares it needs, then probes every tool for real. Missing
+tooling is reported as the file types it blocks, with a pointer to the engineering team.
+
+Runs its probing in a sub-agent and returns just the verdict, so the calling run's context stays clear.
+
+Invoke it by running `/verify-document-skills-requirements`. `generate-workbook` calls it in its
+preflight step.
+
+Requirement lists are read from the installed skills at run time rather than copied here, so they stay
+correct as Anthropic updates them.
+
 ## Repo layout
 
 ```
@@ -72,6 +89,9 @@ plugins/
   generate-workbook/
     .claude-plugin/plugin.json
     skills/generate-workbook/         # SKILL.md + references/ + lib/
+  verify-document-skills-requirements/
+    .claude-plugin/plugin.json
+    skills/verify-document-skills-requirements/
 ```
 
 ## License

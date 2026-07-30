@@ -22,6 +22,13 @@
       "description": "Work in progress. Build the upload workbook for a Worldmaker app out of raw customer source files when the customer did not supply one.",
       "category": "productivity",
       "keywords": ["excel", "workbook", "migration", "upload", "wip"]
+    },
+    {
+      "name": "verify-document-skills-requirements",
+      "source": "./plugins/verify-document-skills-requirements",
+      "description": "Install Anthropic's official document skills if absent, then probe every tool they require on this system and report what is missing.",
+      "category": "productivity",
+      "keywords": ["preflight", "requirements", "documents", "xlsx", "pdf", "docx"]
     }
   ]
 }
