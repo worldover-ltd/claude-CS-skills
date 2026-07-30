@@ -29,8 +29,9 @@ Files inside this skill are referenced with `${CLAUDE_PLUGIN_ROOT}`, set by Clau
 plugin is installed. Running from a raw checkout instead, treat it as the plugin root — the folder
 containing this `skills/` directory.
 
-Write every path with forward slashes and quote any that could contain a space, so the same command
-works on macOS, Linux and Windows.
+The user may be on macOS, Linux or Windows, and the shell differs with them. Write every path with
+forward slashes, quote any that could contain a space, and keep each command on a single line — a
+trailing backslash continues a line in `sh` and breaks it in PowerShell.
 
 ### The app schema
 
@@ -82,8 +83,9 @@ official document skills are what read them in Step 5.
 
 - The Python this system has — try `python3`, `python`, then `py -3`, taking the first that runs
   `-c "import openpyxl"` cleanly. When the interpreter runs but the library is missing,
-  `<interpreter> -m pip install openpyxl` is worth one attempt. It returns the interpreter name, which
-  every later command in the run uses.
+  `<interpreter> -m pip install openpyxl` is worth one attempt; a refusal that the environment is
+  externally managed is a system Python saying no, and is engineering's to sort out. It returns the
+  interpreter name, which every later command in the run uses.
 - Whether `gh repo list WorldoverProd --limit 1` returns a repo, which is how Step 2 reaches the
   customer's app.
 

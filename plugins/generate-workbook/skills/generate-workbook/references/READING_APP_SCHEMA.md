@@ -4,9 +4,9 @@ How to get from a customer name and an app name to `APP_SCHEMA.md`. Every custom
 `WorldoverProd` GitHub organisation and is read with `gh`.
 
 Every command here runs the same on macOS, Linux and Windows: filtering happens inside `gh --jq`
-rather than in a shell pipeline, and the extractor fetches its own input, so nothing depends on
-`grep`, `base64` or shell redirection. `<interpreter>` is whichever Python the preflight step
-resolved.
+rather than in a shell pipeline, the extractor fetches its own input, and each command stays on one
+line — so nothing depends on `grep`, `base64`, shell redirection or POSIX line continuations.
+`<interpreter>` is whichever Python the preflight step resolved.
 
 ## Resolving the repo
 
@@ -16,8 +16,7 @@ Repos are named `<customer>-<app>`, both parts lower case with spaces stripped: 
 List them and filter on the customer name:
 
 ```sh
-gh repo list WorldoverProd --limit 500 --json name \
-  --jq '.[] | select(.name | ascii_downcase | startswith("<customer>")) | .name'
+gh repo list WorldoverProd --limit 500 --json name --jq '.[] | select(.name | ascii_downcase | startswith("<customer>")) | .name'
 ```
 
 Three outcomes:
@@ -40,8 +39,7 @@ insert, and every foreign key. It is around 6,000 lines, so extract rather than 
 extractor takes the repo name and fetches the file itself:
 
 ```sh
-<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/generate-workbook/lib/extract_app_schema.py" \
-  <repo> ".workflow/active/${sessionId}"
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/generate-workbook/lib/extract_app_schema.py" <repo> ".workflow/active/${sessionId}"
 ```
 
 That prints one line per table — column count, foreign key count, what it references — and writes

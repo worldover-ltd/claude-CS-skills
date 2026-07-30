@@ -52,6 +52,11 @@ claude plugin install document-skills@anthropic-agent-skills
 Adding a marketplace that is already configured, or installing a plugin already installed, is
 harmless — run them when `claude plugin list` does not already show `document-skills`.
 
+Where the `claude` command is not on this system's PATH, or installing is refused, the user can do it
+themselves in the session by typing `/plugin marketplace add anthropics/skills` and then
+`/plugin install document-skills`. Hand them those two lines and wait, rather than treating it as
+unavailable.
+
 Reading the installed files works immediately. Invoking the skills through the `Skill` tool needs a
 restart of Claude Code, so mention that to the user at the end of the run if anything will invoke them.
 
@@ -59,9 +64,15 @@ Done when `claude plugin list` shows `document-skills` installed.
 
 # Step 2 — read what the skills require
 
-Find the installed skills on disk — each `SKILL.md` lives under
-`~/.claude/plugins/cache/<marketplace>/document-skills/<version>/skills/<skill>/SKILL.md`, and
-`Glob` locates them without needing to know the version.
+Find the installed skills on disk by asking the installation where it put them, rather than assuming a
+layout. Claude Code records it in `plugins/installed_plugins.json` inside its config directory — the
+`.claude` folder in the user's home directory, or wherever `CLAUDE_CONFIG_DIR` points when that is set.
+The entry keyed `document-skills@anthropic-agent-skills` carries an `installPath`, and each skill sits
+at `<installPath>/skills/<skill>/SKILL.md`.
+
+Where that file or key is not there, `Glob` for `**/skills/*/SKILL.md` beneath the plugins directory
+and pick out the document skills by name. Either route beats hardcoding a path: install scope, cache
+layout and config location all vary between machines.
 
 Read each one and harvest every dependency it names: Python libraries it imports, npm packages it
 requires, command-line binaries it invokes, and anything it tells you to `pip install` or
@@ -84,6 +95,11 @@ by invoking it for its version. Record pass or fail against each row.
 Where a probe fails, try once to install it when it is the kind of thing a package manager handles on
 its own — a Python library or an npm package. A system binary needs administrator rights the user does
 not have, so leave those for the engineering team and mark the row failed.
+
+That one attempt fails on some systems by design: a Linux or macOS Python installed by the operating
+system or a package manager refuses installs outright, saying the environment is externally managed.
+That is the row failing, not something to work around — getting past it needs a virtual environment or
+a different Python, which is engineering's call.
 
 Done when every row in the list carries a pass or a fail from a command that ran, and each fail is
 marked as either fixed by that one install attempt or still missing.
