@@ -29,6 +29,13 @@
       "description": "Install Anthropic's official document skills if absent, then probe every tool they require on this system and report what is missing.",
       "category": "productivity",
       "keywords": ["preflight", "requirements", "documents", "xlsx", "pdf", "docx"]
+    },
+    {
+      "name": "data-site",
+      "source": "./plugins/data-site",
+      "description": "Display a dataset as a browsable site — icon rail, nav panel, list tables and item detail pages — delivered as one self-contained HTML file.",
+      "category": "productivity",
+      "keywords": ["site", "artifact", "data", "table", "react", "display"]
     }
   ]
 }

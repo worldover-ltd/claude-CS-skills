@@ -82,6 +82,22 @@ preflight step.
 Requirement lists are read from the installed skills at run time rather than copied here, so they stay
 correct as Anthropic updates them.
 
+### `data-site`
+
+Display a dataset as a site you can click through instead of a table in chat: an icon rail of big
+concepts, a nav panel of lists inside each one, a table per list, and a detail page per row with
+field blocks and document-style item lists.
+
+The plugin ships a finished React app — the shell — that renders whatever a JSON config describes.
+A run copies the shell into your working directory, writes the config from your data, and bundles
+everything into one self-contained `bundle.html`. The config is validated with Zod first, so a bad
+field is reported as a JSON path rather than a blank page.
+
+Invoke it by running `/data-site`, or ask Claude to "show this data as a site".
+
+Needs Node with npm. The shell lives at `plugins/data-site/skills/data-site/template`; each run
+edits its own copy, never that folder.
+
 ## Repo layout
 
 ```
@@ -96,6 +112,9 @@ plugins/
   verify-document-skills-requirements/
     .claude-plugin/plugin.json
     skills/verify-document-skills-requirements/
+  data-site/
+    .claude-plugin/plugin.json
+    skills/data-site/                 # SKILL.md + template/ (the React shell)
 ```
 
 ## License

@@ -1,0 +1,10 @@
+{
+  "name": "data-site",
+  "version": "0.0.1",
+  "description": "Display a dataset as a browsable site — icon rail, nav panel, list tables and item detail pages — delivered as one self-contained HTML file.",
+  "author": {
+    "name": "Frederico Correia",
+    "email": "frederico.correia@worldover.io"
+  },
+  "keywords": ["site", "artifact", "data", "table", "react", "display"]
+}
