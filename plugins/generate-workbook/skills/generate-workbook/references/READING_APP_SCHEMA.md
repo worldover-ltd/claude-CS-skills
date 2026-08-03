@@ -87,6 +87,27 @@ does not fit:
 So a customer field with no matching column is not a dead end: the app can hold it as a dynamic
 field. Record it in the mapping as needing one, and put it to the user in the grilling.
 
+## The document side
+
+A run that attaches documents to items needs four things out of `APP_SCHEMA.json`, and each is read
+from the JSON rather than assumed from a table name:
+
+- **The documents table** — a table whose name carries `document` and whose columns hold a file name
+  and a storage location (a `storage`, `path` or `key` column). That column pair is what a document
+  row is: a pointer at a file in the app's storage bucket.
+- **How a document attaches to an item** — either the documents table carries a foreign key column
+  straight to the entity table, or a link table sits between them. Read the direction off the
+  `relationships` entries, since the workbook's columns follow it.
+- **The document type list** — a table naming document templates or types, and whether a type is
+  scoped to one entity or shared across all of them. Its rows are the vocabulary a category has to
+  land in.
+- **What identifies an item** — the columns on the entity table the app can look an existing item up
+  by (`code`, `primary_identifier`, `sku`, `name`). The workbook's identifier column has to be one of
+  these, because the item already exists and the migration finds it rather than creating it.
+
+Where the JSON leaves the attachment ambiguous, `CONTEXT.md` and
+`docs/implementations/<feature>/how-to-implement.md` are what settle it.
+
 ## Writing APP_SCHEMA.md
 
 One entry per entity, in the order a user of the app would meet them. Business language for "what it

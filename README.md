@@ -37,8 +37,17 @@ current working directory.
 
 ### `generate-workbook`
 
-**Work in progress.** Build the upload workbook for a Worldmaker app when the customer didn't supply
-one, out of whatever they did send — zips, spreadsheets, Word documents, PDFs, exports.
+**Work in progress.** Two skills that build the workbook a Worldmaker app agent migrates from. Both read
+the customer's app repo first, so the workbook is written in the app's own vocabulary.
+
+Needs Python with `openpyxl`, and `gh` authenticated against the `WorldoverProd` organisation. Runs on
+macOS, Linux and Windows. Intermediate and output files are written under `.workflow/active/<sessionId>/`
+in your current working directory.
+
+#### `generate-workbook` — the data
+
+Build the upload workbook when the customer didn't supply one, out of whatever they did send — zips,
+spreadsheets, Word documents, PDFs, exports.
 
 Invoke it by running `/generate-workbook`, or ask Claude to "build a workbook from these files".
 
@@ -57,11 +66,37 @@ Invoke it by running `/generate-workbook`, or ask Claude to "build a workbook fr
 6. Writes `WORKBOOK.xlsx` in tidy-data layout, with sheets and headers named after the app's own
    tables and columns so its agent doesn't have to guess.
 
-Needs Python with `openpyxl`, and `gh` authenticated against the `WorldoverProd` organisation. Runs on
-macOS, Linux and Windows.
+#### `generate-document-upload-workbook` — the documents
 
-Intermediate and output files are written under `.workflow/active/<sessionId>/` in your current
-working directory.
+Attach a folder of documents onto items that **already exist** in the app. The items are there, the
+documents are already uploaded to the app's storage; this builds the workbook that links the two.
+
+Invoke it by running `/generate-document-upload-workbook`, or ask Claude to "assign these documents to the
+items already in the app".
+
+**What it does**
+
+1. Preflights the same prerequisites, then reads the app repo for the document side of its schema: which
+   kinds of item can hold documents, how one attaches, and which document types the app knows.
+2. Maps the folder you give it — *the tree* — and works out what each level of it means: which level names
+   the kind of item, which one identifies the item, which one names the type of document, and which is
+   noise.
+3. Puts that reading to you branch by branch, with real folder names as evidence and item counts to
+   check against.
+4. **Stops if the tree can't be read.** Folder names are the only evidence for which item a document
+   belongs to, and a guessed attachment is a document filed against the wrong substance. You get the exact
+   folders that failed and what would fix them.
+5. Joins each document to the upload manifest you exported from the app by SHA-256, not by file name — so
+   two documents called `SDS.pdf` in different item folders each resolve to their own upload.
+6. Takes each document's category from its folder, and only reads the documents whose folder doesn't say
+   (that part is handed to `assign-documents`).
+7. Publishes an artifact — the tree, the decisions per branch, real sample rows — and iterates until you
+   approve.
+8. Writes `DOCUMENT_UPLOAD_WORKBOOK.xlsx`: one row per attachment, carrying the item's identifier, the
+   document type, and the `alreadyUploadedFileSHA` / `alreadyUploadedFileSupabaseStoragePath` pair.
+
+Documents that were never uploaded, or that nothing could categorise, are listed on the workbook's
+`README` sheet rather than dropped.
 
 ### `verify-document-skills-requirements`
 
@@ -108,7 +143,8 @@ plugins/
     skills/assign-documents/         # the skill itself (SKILL.md + supporting files)
   generate-workbook/
     .claude-plugin/plugin.json
-    skills/generate-workbook/         # SKILL.md + references/ + lib/
+    skills/generate-workbook/                    # SKILL.md + references/ + lib/
+    skills/generate-document-upload-workbook/    # SKILL.md + references/ + lib/
   verify-document-skills-requirements/
     .claude-plugin/plugin.json
     skills/verify-document-skills-requirements/

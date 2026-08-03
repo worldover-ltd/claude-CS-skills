@@ -70,30 +70,14 @@ The mapping is complete when all four hold for **every** item the customer has d
 
 # Step 1 — preflight, in parallel
 
-The user may be on macOS, Linux or Windows, so nothing here is assumed. Two independent questions, so
-send **both sub agents in a single message** and read their answers together. Each does a pile of
-probing whose output matters only until it reaches a verdict, and a sub agent keeps that out of this
-run's context.
-
-**Document tooling.** One sub agent invokes the `verify-document-skills-requirements` skill and returns
-its verdict. The customer's files arrive as spreadsheets, Word documents and PDFs, and Anthropic's
+The user may be on macOS, Linux or Windows, so nothing here is assumed. Send **both sub agents in a
+single message**, briefed per
+`${CLAUDE_PLUGIN_ROOT}/skills/generate-workbook/references/PREFLIGHT.md`, and read their answers
+together. The customer's files arrive as spreadsheets, Word documents and PDFs, and Anthropic's
 official document skills are what read them in Step 5.
 
-**This run's own prerequisites.** A second sub agent settles two things and returns both:
-
-- The Python this system has — try `python3`, `python`, then `py -3`, taking the first that runs
-  `-c "import openpyxl"` cleanly. When the interpreter runs but the library is missing,
-  `<interpreter> -m pip install openpyxl` is worth one attempt; a refusal that the environment is
-  externally managed is a system Python saying no, and is engineering's to sort out. It returns the
-  interpreter name, which every later command in the run uses.
-- Whether `gh repo list WorldoverProd --limit 1` returns a repo, which is how Step 2 reaches the
-  customer's app.
-
-Read the two verdicts together:
-
-- **Python or repo access missing** — stop here. Tell the user which one, and that someone on the
-  engineering team can set it up: access to the `WorldoverProd` GitHub organisation, or a Python with
-  `openpyxl`. Wait for them to come back with it.
+- **Python or repo access missing** — stop here, as that reference describes, and wait for the user to
+  come back with it.
 - **Document tooling partial** — workable. Carry forward which file types are covered; the rest become
   files the user describes to you in Step 5. Tell them which ones, and that engineering can fix it.
 

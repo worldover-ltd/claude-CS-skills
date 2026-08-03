@@ -1,10 +1,10 @@
 {
   "name": "generate-workbook",
-  "version": "0.0.1",
-  "description": "Work in progress. Build the upload workbook for a Worldmaker app out of raw customer source files (zip, excel, docx, pdf) when the customer did not supply one.",
+  "version": "0.1.0",
+  "description": "Work in progress. Build a Worldmaker app's migration workbook: `generate-workbook` out of raw customer source files (zip, excel, docx, pdf) when the customer did not supply one, and `generate-document-upload-workbook` to attach an already-uploaded folder of documents onto items that already exist in the app.",
   "author": {
     "name": "Frederico Correia",
     "email": "frederico.correia@worldover.io"
   },
-  "keywords": ["excel", "workbook", "generate", "wip"]
+  "keywords": ["excel", "workbook", "generate", "documents", "migration", "wip"]
 }

@@ -19,9 +19,9 @@
     {
       "name": "generate-workbook",
       "source": "./plugins/generate-workbook",
-      "description": "Work in progress. Build the upload workbook for a Worldmaker app out of raw customer source files when the customer did not supply one.",
+      "description": "Work in progress. Build a Worldmaker app's migration workbook — out of raw customer source files when the customer did not supply one, or to attach an already-uploaded folder of documents onto items that already exist in the app.",
       "category": "productivity",
-      "keywords": ["excel", "workbook", "migration", "upload", "wip"]
+      "keywords": ["excel", "workbook", "migration", "upload", "documents", "wip"]
     },
     {
       "name": "verify-document-skills-requirements",
