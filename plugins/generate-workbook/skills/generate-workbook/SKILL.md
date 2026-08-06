@@ -10,9 +10,9 @@ Work in progress. The process below is a first pass and will change with use.
 
 ### Context
 
-The user is on the Customer Service team and is not a developer. Put every question in plain
-business language — items, names, codes, "which of these belongs to which" — and keep column
-types, file formats and scripting out of what they have to decide.
+The user is on the Customer Service team and is not a developer. How a run talks to them — what gets
+asked, what gets tabled, what gets drawn — is `${CLAUDE_PLUGIN_ROOT}/docs/PRESENTING.md`, read at the
+start of a run and applied to every message after it.
 
 A Worldmaker app's agent uploads customer data from a **workbook**: one Excel file it reads as the
 source of truth. Some customers supply that workbook. When one does not, this skill builds it from
@@ -139,10 +139,11 @@ no relationship left with an open end, and every app entity the customer has dat
 
 # Step 7 — show the workbook before building it
 
-Load the `artifact-design` skill, then publish one artifact to
-`.workflow/active/${sessionId}/mapping.html` holding, in this order:
+Load the `artifact-design` skill, then publish one **markdown** artifact to
+`.workflow/active/${sessionId}/mapping.md` holding, in this order:
 
-1. A mermaid ER diagram of the items and their relationships.
+1. An `erDiagram` of the items and their relationships, drawn per
+   `${CLAUDE_PLUGIN_ROOT}/vendor/mermaid-diagrams/references/CLASS-ER.md`.
 2. One card per item: its target entity, its identifier, its fields, what it links to, and any field
    the app has no home for.
 3. A preview of each sheet the workbook will have — real header row, and three to five sample rows

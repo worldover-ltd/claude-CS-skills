@@ -44,9 +44,15 @@ Needs Python with `openpyxl`, and `gh` authenticated against the `WorldoverProd`
 macOS, Linux and Windows. Intermediate and output files are written under `.workflow/active/<sessionId>/`
 in your current working directory.
 
-Both skills share `docs/DOCUMENT_UPLOADING.md` — the Worldmaker stages that follow a run, which you do by
-hand: starting the migration with the finished workbook, then uploading the document files themselves from
-the warning on the migration card.
+Both skills share two things in `docs/`. `DOCUMENT_UPLOADING.md` is the Worldmaker stages that follow a run,
+which you do by hand: starting the migration with the finished workbook, then uploading the document files
+themselves from the warning on the migration card. `PRESENTING.md` is how a run talks to you — what it puts
+as a multiple-choice question rather than a paragraph, what it tables, and the three places it draws a
+diagram. It sits on top of two vendored MIT skills in `vendor/`: `communication-style` from
+[tzachbon/smart-ralph](https://github.com/tzachbon/smart-ralph) for the shape of a message, and
+`mermaid-diagrams` from [ccheney/robust-skills](https://github.com/ccheney/robust-skills) for drawing one.
+Both are copies rather than dependencies, so there is nothing extra to install; `vendor/NOTICE.md` records
+the upstream commit and what was cut.
 
 #### `generate-workbook` — the data
 
@@ -167,6 +173,7 @@ plugins/
   generate-workbook/
     .claude-plugin/plugin.json
     docs/                                        # shared across the plugin's skills
+    vendor/                                      # MIT copies of third-party skills, used as references
     skills/generate-workbook/                    # SKILL.md + references/ + lib/
     skills/generate-document-upload-workbook/    # SKILL.md + references/ + lib/
   categorise-documents/

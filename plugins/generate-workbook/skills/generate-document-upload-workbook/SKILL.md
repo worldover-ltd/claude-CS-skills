@@ -10,9 +10,9 @@ Work in progress. The process below is a first pass and will change with use.
 
 ### Context
 
-The user is on the Customer Service team and is not a developer. Put every question in plain business
-language — items, names, codes, "which of these belongs to which" — and keep column types, file formats
-and scripting out of what they have to decide.
+The user is on the Customer Service team and is not a developer. How a run talks to them — what gets asked,
+what gets tabled, what gets drawn — is `${CLAUDE_PLUGIN_ROOT}/docs/PRESENTING.md`, read at the start of a run
+and applied to every message after it.
 
 The **items** already exist in the customer's Worldmaker app. The **documents** are a folder of files on
 the user's computer. What is missing is the link between them, and this skill builds the workbook that
@@ -125,11 +125,12 @@ been opened.
 
 Reach a verdict on the tree per that same reference.
 
-**Legible** — put your reading to the user before acting on it: a markdown table per branch giving the
-kind of item you take it to hold, the app entity that is, what identifies each item with two or three
-real names from the folders as evidence, the document type level if there is one, and the item and
-document counts. Ask them to confirm or correct each branch, and offer the entity choices as options
-rather than making them recall the app's vocabulary. Write the confirmed reading into `MAPPING.md`.
+**Legible** — put your reading to the user before acting on it, one branch at a time: a markdown table
+giving the kind of item you take it to hold, the app entity that is, what identifies each item with two or
+three real names from the folders as evidence, the document type level if there is one, and the item and
+document counts. Then ask them to confirm or correct that branch, the entity choices offered as options
+rather than making them recall the app's vocabulary. Write each confirmed branch into `MAPPING.md` as it
+lands.
 
 **Illegible** — stop, and hand back something they can act on: which folders you could not resolve and
 what was missing in each, what a legible tree looks like for their case (one folder per item, named with
@@ -167,10 +168,12 @@ pile the user has seen.
 
 # Step 7 — show the workbook before building it
 
-Load the `artifact-design` skill, then publish one artifact to `.workflow/active/${sessionId}/tree.html`
-holding, in this order:
+Load the `artifact-design` skill, then publish one **markdown** artifact to
+`.workflow/active/${sessionId}/tree.md` holding, in this order:
 
-1. The tree as a diagram, with each level labelled by the role Step 5 gave it.
+1. The tree as a `flowchart TD`, each level labelled by the role Step 5 gave it, drawn per
+   `${CLAUDE_PLUGIN_ROOT}/vendor/mermaid-diagrams/references/FLOWCHARTS.md`. A tree too wide to read is
+   one diagram per branch, not one crowded diagram.
 2. One card per branch: target entity, identifier column, document types found, item count, document
    count.
 3. A preview of each sheet the workbook will have — real header row, and three to five real rows, with

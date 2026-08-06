@@ -1,6 +1,9 @@
 # Runtime session artifacts produced when running skills
 .workflow/
 
+# Local working notes, one folder per piece of work
+.scratch/
+
 # Python bytecode from running the skills' helper scripts
 __pycache__/
 *.pyc

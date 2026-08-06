@@ -5,6 +5,22 @@ Getting a customer's documents into their Worldmaker app takes three stages, in 
 Worldmaker. The document files stay on the user's computer the whole time a run is happening — they are
 uploaded last, out of the migration itself.
 
+Drawn, so it can be shown to the user rather than described:
+
+```mermaid
+stateDiagram-v2
+    state "Workbook built" as Mapped
+    state "Migration waiting for files" as Awaiting
+    state "Documents attached" as Done
+
+    [*] --> Mapped : a skill maps the documents
+    Mapped --> Awaiting : migration started, file_sha and file_name found
+    Mapped --> Done : no document columns, so nothing is expected
+    Awaiting --> Done : files uploaded from the card, matched by SHA-256
+    Awaiting --> Mapped : a file was edited, so its hash no longer matches
+    Done --> [*]
+```
+
 ## Map — the skills
 
 Which skill applies depends on what the app already holds:
