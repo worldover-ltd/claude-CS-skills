@@ -30,6 +30,10 @@ instance, one column per field, one value per cell.
 - Identifiers and codes written as text so leading zeros survive: `007` stays `007`.
 - An unknown value is an empty cell. Leave it empty rather than filling `N/A`, `-` or `unknown`.
 - Values only — no formulas, no cross-sheet references.
+- A sheet carrying documents identifies each file by two columns and nothing else: `file_sha`, the
+  SHA-256 of its bytes, and `file_name`, its name with extension and no path. Finding those is what makes
+  the migration ask the user for the files afterwards — `${CLAUDE_PLUGIN_ROOT}/docs/DOCUMENT_UPLOADING.md`
+  is that stage.
 
 ## Relationships
 

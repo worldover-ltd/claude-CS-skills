@@ -24,6 +24,13 @@
       "keywords": ["excel", "workbook", "migration", "upload", "documents", "wip"]
     },
     {
+      "name": "categorise-documents",
+      "source": "./plugins/categorise-documents",
+      "description": "Give every file in a list its document type, read in parallel batches with every document accounted for.",
+      "category": "productivity",
+      "keywords": ["documents", "categorize", "taxonomy", "workflow", "regulatory"]
+    },
+    {
       "name": "verify-document-skills-requirements",
       "source": "./plugins/verify-document-skills-requirements",
       "description": "Install Anthropic's official document skills if absent, then probe every tool they require on this system and report what is missing.",

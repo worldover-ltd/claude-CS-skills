@@ -10,14 +10,13 @@ on the exception list instead.
   `products_documents`. The app agent reads this file against its own schema, so matching its table names
   is what saves it from guessing.
 - A `Document Templates` sheet with `Name` and `id`, one row per document type that appears anywhere in the
-  workbook. Compute the id the way `assign-documents` does — `dt_` followed by the first 12 hex characters
-  of the SHA-256 of the lower-cased, stripped name — so a type resolves to the same id in both flows and
-  across re-runs.
+  workbook. The id is `dt_` followed by the first 12 hex characters of the SHA-256 of the lower-cased,
+  stripped name, so the same type resolves to the same id across re-runs and across workbooks.
 - A `README` sheet first, before everything else. One row per data sheet with: sheet name, which app entity
   it attaches documents to, which column holds the item identifier and which app column that is, the
   document count, and the folder the rows came from. Below that, the exceptions, one row each with the file
-  name, its folder and why it is not in a data sheet: no manifest entry, so never uploaded; no category; or
-  a folder the user could not resolve to an item.
+  name, its folder and why it is not in a data sheet: no category, or a folder the user could not resolve
+  to an item.
 - Data starts at cell `A1` with the header row, values from row 2 down. No title banner, no merged cells,
   no blank spacer rows.
 
@@ -30,22 +29,24 @@ In this order, on every data sheet:
 | the item identifier | the anchor value, in a column named exactly as the app spells the column it looks the item up by — `code`, `primary_identifier` |
 | `document_category` | the document type's name, as the app's own list spells it |
 | `documentTemplateId` | that type's id, matching the `Document Templates` sheet |
-| `file_name` | the document's file name, as the manifest holds it |
-| `alreadyUploadedFileSHA` | the document's SHA-256, lower-case hex |
-| `alreadyUploadedFileSupabaseStoragePath` | the `storageKey` from the manifest entry that SHA matched |
+| `file_name` | the document's file name with its extension and no path: `SDS_2026.pdf` |
+| `file_sha` | the document's SHA-256, lower-case hex |
 | `source_folder_path` | the document's folder, relative to the folder the user gave, so any row can be traced back to what it was read from |
+
+`file_name` and `file_sha` are the two the migration agent looks for, and finding them is what makes it
+expect documents at all — so they are spelled exactly like that, on every data sheet.
 
 Where the app attaches documents through a link table rather than a column, the identifier column still
 comes first and still names the item — the app agent resolves the link. Say which shape the app has in
 `README`.
 
-Every value is text as written: identifiers keep leading zeros, SHAs and storage paths are never
-reformatted, and an unknown is an empty cell rather than `N/A`. No formulas, no cross-sheet references.
+Every value is text as written: identifiers keep leading zeros, SHAs are never reformatted or
+upper-cased, and an unknown is an empty cell rather than `N/A`. No formulas, no cross-sheet references.
 
 ## Before handing it over
 
 - Every row's identifier value appears in the anchor level of `TREE.json`.
-- Every row's SHA appears in `UPLOAD_MANIFEST.json`, and every `documentTemplateId` in
+- Every row's `file_sha` appears in `DOCUMENTS.json`, and every `documentTemplateId` in
   `Document Templates`.
 - Every document in `DOCUMENTS.json` is in exactly one place: a data sheet row, or the `README` exception
   list. Counts across the two add up to the file count `map_tree.py` reported.

@@ -44,6 +44,10 @@ Needs Python with `openpyxl`, and `gh` authenticated against the `WorldoverProd`
 macOS, Linux and Windows. Intermediate and output files are written under `.workflow/active/<sessionId>/`
 in your current working directory.
 
+Both skills share `docs/DOCUMENT_UPLOADING.md` — the Worldmaker stages that follow a run, which you do by
+hand: starting the migration with the finished workbook, then uploading the document files themselves from
+the warning on the migration card.
+
 #### `generate-workbook` — the data
 
 Build the upload workbook when the customer didn't supply one, out of whatever they did send — zips,
@@ -68,8 +72,9 @@ Invoke it by running `/generate-workbook`, or ask Claude to "build a workbook fr
 
 #### `generate-document-upload-workbook` — the documents
 
-Attach a folder of documents onto items that **already exist** in the app. The items are there, the
-documents are already uploaded to the app's storage; this builds the workbook that links the two.
+Attach a folder of documents onto items that **already exist** in the app. The items are there and the
+documents are a folder on your computer; this builds the workbook that links the two. The files themselves
+are uploaded at the end, out of the migration.
 
 Invoke it by running `/generate-document-upload-workbook`, or ask Claude to "assign these documents to the
 items already in the app".
@@ -86,17 +91,35 @@ items already in the app".
 4. **Stops if the tree can't be read.** Folder names are the only evidence for which item a document
    belongs to, and a guessed attachment is a document filed against the wrong substance. You get the exact
    folders that failed and what would fix them.
-5. Joins each document to the upload manifest you exported from the app by SHA-256, not by file name — so
-   two documents called `SDS.pdf` in different item folders each resolve to their own upload.
-6. Takes each document's category from its folder, and only reads the documents whose folder doesn't say
-   (that part is handed to `assign-documents`).
+5. Hashes every document, since SHA-256 is how the upload screen matches a file to its row later — so
+   two documents called `SDS.pdf` in different item folders stay distinct.
+6. Takes each document's category from its folder, and fans sub-agents out to read only the documents
+   whose folder doesn't say.
 7. Publishes an artifact — the tree, the decisions per branch, real sample rows — and iterates until you
    approve.
 8. Writes `DOCUMENT_UPLOAD_WORKBOOK.xlsx`: one row per attachment, carrying the item's identifier, the
-   document type, and the `alreadyUploadedFileSHA` / `alreadyUploadedFileSupabaseStoragePath` pair.
+   document type, and the `file_name` / `file_sha` pair the migration looks for.
 
-Documents that were never uploaded, or that nothing could categorise, are listed on the workbook's
-`README` sheet rather than dropped.
+Documents nothing could categorise are listed on the workbook's `README` sheet rather than dropped.
+
+### `categorise-documents`
+
+Give every file in a list its document type. One job, so anything that has already collected a pile of
+documents can hand them over: `generate-document-upload-workbook` calls it for the documents whose folder
+name doesn't say what they are.
+
+Invoke it by running `/categorise-documents`, or ask Claude to "sort these documents by type".
+
+Categories come from a vocabulary the caller passes — the app's own document type list, usually — falling
+back to a built-in taxonomy of ~280 cosmetics, chemical and compliance document types. Reading is fanned
+out in batches of ten, driven by a workflow script when there are enough documents to be worth it.
+
+Nothing is quietly dropped: every document that goes out to a sub-agent has to answer, silent ones are
+sent again, and whatever is still missing comes back marked `unread`. Documents that fit nothing in the
+vocabulary come back marked `invented` rather than forced into the nearest category.
+
+Input and output are two files in the run's session directory, `TO_CATEGORISE.json` and
+`CATEGORIES.json`, joined on the document's path.
 
 ### `verify-document-skills-requirements`
 
@@ -143,8 +166,12 @@ plugins/
     skills/assign-documents/         # the skill itself (SKILL.md + supporting files)
   generate-workbook/
     .claude-plugin/plugin.json
+    docs/                                        # shared across the plugin's skills
     skills/generate-workbook/                    # SKILL.md + references/ + lib/
     skills/generate-document-upload-workbook/    # SKILL.md + references/ + lib/
+  categorise-documents/
+    .claude-plugin/plugin.json
+    skills/categorise-documents/                 # SKILL.md + references/ + lib/
   verify-document-skills-requirements/
     .claude-plugin/plugin.json
     skills/verify-document-skills-requirements/

@@ -1,6 +1,6 @@
 ---
 name: generate-document-upload-workbook
-description: "Build the workbook that attaches documents already uploaded to a Worldmaker app onto items that already exist in it, read off the folder tree the customer sent. Triggers on \"generate-document-upload-workbook\", or when the user wants a folder of documents assigned to existing items for a migration."
+description: "Build the workbook that attaches a folder of documents onto items that already exist in a Worldmaker app, reading the assignment off the folder tree the customer organised. Triggers on \"generate-document-upload-workbook\", or when the user wants documents assigned to existing items for a migration."
 allowed-tools: Agent, Skill, AskUserQuestion, TodoWrite, Read, Write, Edit, Bash, Glob, Grep, Artifact
 ---
 
@@ -14,10 +14,14 @@ The user is on the Customer Service team and is not a developer. Put every quest
 language — items, names, codes, "which of these belongs to which" — and keep column types, file formats
 and scripting out of what they have to decide.
 
-Both halves of this job are already done when the run starts: the **items** exist in the customer's
-Worldmaker app, and the **documents** have been uploaded to its storage. What is missing is the link
-between them. This skill builds the workbook that carries that link — one row per document, naming the
-item it attaches to — for an app agent to migrate.
+The **items** already exist in the customer's Worldmaker app. The **documents** are a folder of files on
+the user's computer. What is missing is the link between them, and this skill builds the workbook that
+carries it — one row per document, naming the item it attaches to and identifying the file by its
+SHA-256.
+
+The files themselves are uploaded last, by the user, out of the migration once it exists. So a run reads
+documents and never sends them anywhere:
+`${CLAUDE_PLUGIN_ROOT}/docs/DOCUMENT_UPLOADING.md` is that wider journey.
 
 ### Session setup
 
@@ -138,29 +142,27 @@ has stopped with the unresolved folders named.
 
 # Step 6 — resolve every document
 
-Two facts are still missing per document: where its uploaded copy lives, and what type of document it is.
+Two facts are still missing per document: which file it is, and what type of document it is.
 
-**Storage.** Ask the user for the upload manifest — the JSON they exported when they uploaded these
-documents to the app, holding a `fileName`, `storageKey` and `sha` per document. Store it verbatim at
-`.workflow/active/${sessionId}/UPLOAD_MANIFEST.json`, then join it to the tree:
+**Identity.** A document is carried into the workbook as its SHA-256, because that is what the upload
+screen matches on later — names collide between item folders and paths change, the hash does neither.
+Hash the tree:
 
 ```sh
-<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/lib/join_manifest.py" "<folder>" ".workflow/active/${sessionId}/UPLOAD_MANIFEST.json" ".workflow/active/${sessionId}"
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/lib/hash_documents.py" "<folder>" ".workflow/active/${sessionId}"
 ```
 
-That hashes every file in the tree and matches it to its manifest entry by SHA-256 rather than by name,
-so two documents called `SDS.pdf` in different item folders each resolve to their own upload. It writes
-`DOCUMENTS.json` and prints what did not resolve.
+That writes `DOCUMENTS.json`, and reports the same file filed under more than one item — one document
+belonging to several items, which is a row each rather than a problem.
 
 **Category.** Follow
 `${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/references/CATEGORIES.md`: a folder that
 names the document type gives its category directly, and only the documents whose folders are silent get
 read.
 
-Then put both exception piles to the user — documents with no manifest entry, meaning they were never
-uploaded, and documents left without a category — because each is theirs to resolve.
+Then put the documents left without a category to the user, since that is theirs to resolve.
 
-Done when every file in `TREE.json` either carries a storage path and a category, or sits on an exception
+Done when every file in `TREE.json` carries a SHA-256 and either a category or a place on the exception
 pile the user has seen.
 
 # Step 7 — show the workbook before building it
@@ -172,8 +174,8 @@ holding, in this order:
 2. One card per branch: target entity, identifier column, document types found, item count, document
    count.
 3. A preview of each sheet the workbook will have — real header row, and three to five real rows, with
-   real folder names, real storage paths and real categories.
-4. The exception piles, listed by file name.
+   real folder names, real file names and real categories.
+4. The exception pile, listed by file name.
 
 The sheet preview is what the user can judge, so fill it with real values rather than placeholders.
 
@@ -193,13 +195,17 @@ with the row counts `MAPPING.md` predicted.
 # Step 9 — hand it over
 
 Give the user the full path to `DOCUMENT_UPLOAD_WORKBOOK.xlsx`, one line per sheet saying which kind of
-item it attaches documents to and how many, whatever ended up on the exception piles, and the two or
-three attachments worth spot-checking before they give it to the app agent — the ones whose folder names
-you had least evidence for.
+item it attaches documents to and how many, whatever ended up on the exception pile, and the two or three
+attachments worth spot-checking — the ones whose folder names you had least evidence for.
+
+Then what happens next, since two things are still to come and one of them can catch them out: they start
+a migration with this workbook, and the migration then asks them for the document files themselves. Those
+files have to be the ones this run hashed — an edited or re-exported document no longer matches its row.
 
 ### Helping the user
 
-The user may need help with the parts they do themselves: finding where the customer's documents landed,
-linking a folder to you, exporting the upload manifest out of the app, getting the finished workbook out
-of the session directory, handing it to the Worldmaker app agent. Offer that help as it comes up rather
-than waiting to be asked.
+A run is one stage of a longer journey the user does the rest of by hand: they start the migration with
+the workbook you hand over, then upload the document files from the migration card.
+`${CLAUDE_PLUGIN_ROOT}/docs/DOCUMENT_UPLOADING.md` holds both stages, and is what to read when the user
+asks how the upload works or what to do with the workbook. Offer that help as it comes up rather than
+waiting to be asked.

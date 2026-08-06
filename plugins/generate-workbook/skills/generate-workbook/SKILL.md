@@ -173,3 +173,6 @@ had least evidence for.
 The user may need help with the parts they do themselves: finding where the customer's files landed,
 linking a folder to you, getting the finished workbook out of the session directory, handing it to
 the Worldmaker app agent. Offer that help as it comes up rather than waiting to be asked.
+
+What becomes of the workbook after you hand it over — starting the migration in Worldmaker, and what the
+migration expects a workbook to be — is in `${CLAUDE_PLUGIN_ROOT}/docs/DOCUMENT_UPLOADING.md`.
