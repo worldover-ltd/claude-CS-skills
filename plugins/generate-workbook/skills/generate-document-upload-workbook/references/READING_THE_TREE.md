@@ -25,8 +25,9 @@ the level's own distinct-name count:
 
 - A level whose names are nearly all distinct, and whose count is in the order of the customer's item
   count, is the **anchor**. Codes, SKUs and long names sit here.
-- A level whose few names repeat across every branch is a **category level**. "SDS" appearing under 300
-  item folders is a document type, not an item.
+- A level whose few names repeat across every branch is a **template level**. "SDS" appearing under 300
+  item folders is a kind of document, not an item. Where two such levels sit one inside the other, the
+  inner one is the template level and the outer one is the customer's own grouping of them — a section.
 - A level with a handful of names that each cover a large, disjoint chunk of the tree is an **entity
   level**. Match its names against the entities recorded in `APP_SCHEMA.md`.
 - Anything left — dates, versions, "Final", "OLD", "scans", "to check" — is **noise**, and is recorded as

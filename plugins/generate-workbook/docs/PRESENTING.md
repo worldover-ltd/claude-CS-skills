@@ -28,6 +28,7 @@ means instead.
 |---|---|
 | Documents attach through a link table rather than a column | (cut — nothing changes for them) |
 | `document_templates` rows live in the app, not the repo | "I can't check your folder names against the app's own list of document types — that list only exists inside the app. So you're the judge of whether a folder called SDS matches what this app already calls it." |
+| Sections are `field_sections` scoped by `owner_type`, attached via `section_attachments` | "Each kind of item gets its own set of document groups, so raw materials and products don't have to share them." |
 | `code` is nullable on every entity that has it | "Not every item has a code. If your folders are named by code, anything missing one won't match." |
 | Written to `APP_SCHEMA.md` | (cut — they will never open it) |
 | Scanned PDFs need Tesseract, `.doc` needs LibreOffice | "If any of your documents are scans or old-format Word files, I won't be able to read them — you'd tell me what those are instead." |
@@ -59,11 +60,22 @@ it changes.**
 
 For a document run, one row per branch of the tree:
 
-| Folder | Kind of item | Identified by | Document type from | Documents |
+| Folder | Kind of item | Identified by | Document template from | Documents |
 |---|---|---|---|---|
 | `Raw Materials/` | Raw Material | folder name, a code like `RM-0142` | the sub-folder (`SDS`, `CoA`) | 208 |
 | `Products/` | Product | folder name — **is it the code or the name?** | ? | 96 |
 | `Misc/` | ? | ? | ? | 14 |
+
+Later in the same run it carries the grouping instead, one row per section:
+
+| Section | Document templates in it | Documents |
+|---|---|---|
+| Safety | Safety Data Sheet (SDS), Hazard Assessment | 142 |
+| Quality | Certificate of Analysis (CoA), Spec Sheet | 96 |
+| ? | Allergen Declaration | 12 |
+
+**Document template** and **section** are the app's own words for these, so they are the user's too — the
+terms to replace are the ones naming how they are stored.
 
 For a data run, one row per source file: the kind of item it holds, what identifies each one, how many, and
 whether its columns have a home in the app.

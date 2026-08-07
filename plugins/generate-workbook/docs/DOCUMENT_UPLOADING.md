@@ -68,7 +68,7 @@ they are what a correction has to preserve:
   resolves to nothing.
 - **It expects the files later, not now.** A row carries `file_sha` and `file_name`. Nothing in the
   workbook points into storage, because at migration time the file is not there yet.
-- **It reads the app's own vocabulary.** Sheet names, column names and document type names are matched
+- **It reads the app's own vocabulary.** Sheet names, column names and document template names are matched
   against the app's schema, which is why every run reads the customer's repo before writing anything.
 
 The layout that satisfies these is

@@ -89,7 +89,7 @@ field. Record it in the mapping as needing one, and put it to the user in the gr
 
 ## The document side
 
-A run that attaches documents to items needs four things out of `APP_SCHEMA.json`, and each is read
+A run that attaches documents to items needs five things out of `APP_SCHEMA.json`, and each is read
 from the JSON rather than assumed from a table name:
 
 - **The documents table** — a table whose name carries `document` and whose columns hold a file name
@@ -98,9 +98,15 @@ from the JSON rather than assumed from a table name:
 - **How a document attaches to an item** — either the documents table carries a foreign key column
   straight to the entity table, or a link table sits between them. Read the direction off the
   `relationships` entries, since the workbook's columns follow it.
-- **The document type list** — a table naming document templates or types, and whether a type is
-  scoped to one entity or shared across all of them. Its rows are the vocabulary a category has to
-  land in.
+- **The document template list** — a table naming document templates (`document_templates`), and
+  whether a template is scoped to one entity or shared across all of them. Its rows are the vocabulary
+  a document's kind has to land in.
+- **The sections that group those templates** — a sections table (`field_sections`) carrying a `label`,
+  a `key` and a `sort_order`, scoped to one owner by an `owner_type`/`owner_id` pair, plus the link
+  table that attaches a template to a section (`section_attachments`, whose `kind` distinguishes a
+  document attachment from a field one). A section is per entity, so read which owner types the app
+  uses. An app whose sections table is empty at read time is normal — the rows are created in the app
+  itself rather than seeded by a migration, so the run proposes sections instead of matching them.
 - **What identifies an item** — the columns on the entity table the app can look an existing item up
   by (`code`, `primary_identifier`, `sku`, `name`). The workbook's identifier column has to be one of
   these, because the item already exists and the migration finds it rather than creating it.

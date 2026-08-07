@@ -9,13 +9,18 @@ on the exception list instead.
 - One data sheet per target entity, named `<entity_table>_documents`: `raw_materials_documents`,
   `products_documents`. The app agent reads this file against its own schema, so matching its table names
   is what saves it from guessing.
-- A `Document Templates` sheet with `Name` and `id`, one row per document type that appears anywhere in the
-  workbook. The id is `dt_` followed by the first 12 hex characters of the SHA-256 of the lower-cased,
-  stripped name, so the same type resolves to the same id across re-runs and across workbooks.
+- A `Document Templates` sheet with `Name`, `id`, `entity` and `section_id`, one row per document template
+  that appears anywhere in the workbook. The id is `dt_` followed by the first 12 hex characters of the
+  SHA-256 of the lower-cased, stripped name, so the same template resolves to the same id across re-runs and
+  across workbooks. `section_id` is the section that template belongs to on that entity.
+- A `Document Sections` sheet with `label`, `key`, `id`, `entity` and `sort_order`, one row per section. The
+  id is `ds_` followed by the first 12 hex characters of the SHA-256 of `<entity>:<key>` — the entity is in
+  the hash because the app scopes a section to one owner, so two entities with a "Safety" section have two
+  different sections rather than one shared.
 - A `README` sheet first, before everything else. One row per data sheet with: sheet name, which app entity
   it attaches documents to, which column holds the item identifier and which app column that is, the
   document count, and the folder the rows came from. Below that, the exceptions, one row each with the file
-  name, its folder and why it is not in a data sheet: no category, or a folder the user could not resolve
+  name, its folder and why it is not in a data sheet: no template, or a folder the user could not resolve
   to an item.
 - Data starts at cell `A1` with the header row, values from row 2 down. No title banner, no merged cells,
   no blank spacer rows.
@@ -27,14 +32,18 @@ In this order, on every data sheet:
 | column | holds |
 | --- | --- |
 | the item identifier | the anchor value, in a column named exactly as the app spells the column it looks the item up by — `code`, `primary_identifier` |
-| `document_category` | the document type's name, as the app's own list spells it |
-| `documentTemplateId` | that type's id, matching the `Document Templates` sheet |
+| `document_template` | the document template's name, as the app's own list spells it |
+| `documentTemplateId` | that template's id, matching the `Document Templates` sheet |
 | `file_name` | the document's file name with its extension and no path: `SDS_2026.pdf` |
 | `file_sha` | the document's SHA-256, lower-case hex |
 | `source_folder_path` | the document's folder, relative to the folder the user gave, so any row can be traced back to what it was read from |
 
 `file_name` and `file_sha` are the two the migration agent looks for, and finding them is what makes it
 expect documents at all — so they are spelled exactly like that, on every data sheet.
+
+A data row carries no section. A section groups templates rather than documents, so it is a property of the
+template and lives on the `Document Templates` sheet — the same shape the app has, where
+`section_attachments` links a section to a document template and never to a document.
 
 Where the app attaches documents through a link table rather than a column, the identifier column still
 comes first and still names the item — the app agent resolves the link. Say which shape the app has in
@@ -48,6 +57,8 @@ upper-cased, and an unknown is an empty cell rather than `N/A`. No formulas, no 
 - Every row's identifier value appears in the anchor level of `TREE.json`.
 - Every row's `file_sha` appears in `DOCUMENTS.json`, and every `documentTemplateId` in
   `Document Templates`.
+- Every `Document Templates` row carries a `section_id` that appears in `Document Sections`, and every
+  section holds at least one template.
 - Every document in `DOCUMENTS.json` is in exactly one place: a data sheet row, or the `README` exception
   list. Counts across the two add up to the file count `map_tree.py` reported.
 

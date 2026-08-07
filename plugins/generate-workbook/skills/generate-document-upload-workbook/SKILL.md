@@ -54,7 +54,9 @@ mapping:
 - **anchor level** — its names carry the identifier of one item. The anchor is the level the whole
   mapping hangs off. It can be a folder level, or the file names themselves when documents sit flat in
   an item's folder (`RM-0142_SDS.pdf`).
-- **category level** — its names are kinds of document ("SDS", "CoA"), repeating across branches.
+- **template level** — its names are kinds of document ("SDS", "CoA"), repeating across branches. Each one
+  is a **document template**, and the sections that group those templates are worked out later, from the
+  templates themselves.
 - **noise** — dates, "Final", "OLD", "scans": levels that identify nothing.
 
 A tree is **legible** when every document under it resolves to exactly one item through an anchor whose
@@ -68,8 +70,9 @@ The **mapping** is the tree expressed in the app's terms, and the thing the user
 
 - **target entity** — the app entity, and the table backing it, whose items these documents attach to.
 - **identifier** — the anchor level, and the app column its names feed (`code`, `primary_identifier`).
-- **category** — the level that names the document type, or a recorded decision that the tree is silent
-  and the categories come from reading the documents.
+- **template** — the level that names the kind of document, or a recorded decision that the tree is silent
+  and the templates come from reading the documents.
+- **sections** — the groups those templates fall into on this entity, settled once the templates are.
 - **counts** — how many items and how many documents that branch holds, so the user can sanity-check the
   reading against what they know they sent.
 
@@ -84,8 +87,8 @@ together.
 - **Python or repo access missing** — stop here, as that reference describes, and wait for the user to
   come back with it.
 - **Document tooling partial** — workable, and often costs nothing. The documents are only ever opened
-  to categorise the ones whose folder does not name a category (Step 6), so carry the covered file types
-  forward and tell the user which are missing and that engineering can fix it.
+  to work out the kind of document where the folder does not say, so carry the covered file types forward
+  and tell the user which are missing and that engineering can fix it.
 
 Done when both sub agents have reported, the interpreter name is recorded, repo access is confirmed, and
 the covered file types are known.
@@ -105,7 +108,8 @@ Done when the user confirms one repo.
 
 Extract the schema per that same reference, then read its "## The document side" section and record, at
 `.workflow/active/${sessionId}/APP_SCHEMA.md`: which entities can hold documents, how a document attaches
-to one, which columns the app can look an existing item up by, and the app's own list of document types.
+to one, which columns the app can look an existing item up by, and the app's own document templates and the
+sections they are grouped into.
 
 Then put it back to the user as a table — which kinds of item can carry documents, what identifies each kind
 — and ask them to confirm or correct it, since it drives the rest of the run. Anything the app's own data
@@ -157,17 +161,30 @@ Hash the tree:
 That writes `DOCUMENTS.json`, and reports the same file filed under more than one item — one document
 belonging to several items, which is a row each rather than a problem.
 
-**Category.** Follow
-`${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/references/CATEGORIES.md`: a folder that
-names the document type gives its category directly, and only the documents whose folders are silent get
-read.
+**Template.** Follow Part 1 of
+`${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/references/TEMPLATES_AND_SECTIONS.md`: a
+folder that names the kind of document gives its template directly, and only the documents whose folders
+are silent get read.
 
-Then put the documents left without a category to the user, since that is theirs to resolve.
+Then put the documents left without a template to the user, since that is theirs to resolve.
 
-Done when every file in `TREE.json` carries a SHA-256 and either a category or a place on the exception
-pile the user has seen.
+Done when every file in `TREE.json` carries a SHA-256 and either a document template or a place on the
+exception pile the user has seen.
 
-# Step 7 — show the workbook before building it
+# Step 7 — group the templates into sections
+
+Only now is there a full list of templates to group, and grouping them is what gives each item's page its
+shape in the app. Follow Part 2 of that same reference: per entity, take the tree's own grouping where it
+has one, otherwise sort the templates into two to six sections.
+
+This is a judgement rather than a reading, so it goes to the user as **the board** — one row per section,
+the templates under it, the document count behind each — and they move a template, rename a section or
+merge two until it is theirs.
+
+Done when every template the workbook uses belongs to exactly one section of its entity, every section
+holds at least one template, and the user has approved the grouping.
+
+# Step 8 — show the workbook before building it
 
 Load the `artifact-design` skill, then publish one **markdown** artifact to
 `.workflow/active/${sessionId}/tree.md` holding, in this order:
@@ -175,18 +192,20 @@ Load the `artifact-design` skill, then publish one **markdown** artifact to
 1. The tree as a `flowchart TD`, each level labelled by the role Step 5 gave it, drawn per
    `${CLAUDE_PLUGIN_ROOT}/vendor/mermaid-diagrams/references/FLOWCHARTS.md`. A tree too wide to read is
    one diagram per branch, not one crowded diagram.
-2. One card per branch: target entity, identifier column, document types found, item count, document
+2. One card per branch: target entity, identifier column, document templates found, item count, document
    count.
-3. A preview of each sheet the workbook will have — real header row, and three to five real rows, with
-   real folder names, real file names and real categories.
-4. The exception pile, listed by file name.
+3. The sections per entity, each with the templates under it, so the shape an item's page will take is
+   visible before it is built.
+4. A preview of each sheet the workbook will have — real header row, and three to five real rows, with
+   real folder names, real file names and real template names.
+5. The exception pile, listed by file name.
 
 The sheet preview is what the user can judge, so fill it with real values rather than placeholders.
 
 Iterate: take their corrections, update `MAPPING.md`, republish to the same file path so the URL holds.
 Done when the user approves what the artifact shows.
 
-# Step 8 — write the workbook
+# Step 9 — write the workbook
 
 Build the Excel file per
 `${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/references/DOCUMENT_WORKBOOK_FORMAT.md`,
@@ -196,11 +215,12 @@ Done when every document in `DOCUMENTS.json` appears either as a row in a data s
 sheet's exception list, every identifier value traces back to an anchor name, and the file loads back
 with the row counts `MAPPING.md` predicted.
 
-# Step 9 — hand it over
+# Step 10 — hand it over
 
 Give the user the full path to `DOCUMENT_UPLOAD_WORKBOOK.xlsx`, one line per sheet saying which kind of
-item it attaches documents to and how many, whatever ended up on the exception pile, and the two or three
-attachments worth spot-checking — the ones whose folder names you had least evidence for.
+item it attaches documents to and how many, the sections each entity ended up with, whatever ended up on
+the exception pile, and the two or three attachments worth spot-checking — the ones whose folder names you
+had least evidence for.
 
 Then what happens next, since two things are still to come and one of them can catch them out: they start
 a migration with this workbook, and the migration then asks them for the document files themselves. Those
