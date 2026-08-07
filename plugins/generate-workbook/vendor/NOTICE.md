@@ -21,8 +21,11 @@ readable and re-vendoring is a fresh copy plus the same cuts. Everything this re
 **Deleted:** the `## SpecKit-Specific Guidelines` section — constitution markers (`[C§3.1]`), user story IDs
 (`[US1]`, `T001`) and task-description conventions, all of which belong to the Ralph spec-driven workflow.
 
-**Overridden by `docs/PRESENTING.md`:** the "fragments over full sentences" rule, for the opening overview only,
-and rule 4 — unresolved questions go through `AskUserQuestion`, not a bullet list.
+**Overridden by `docs/PRESENTING.md`:** its core rule. Only the structure is taken — the four-part order and
+the anti-patterns table. "Be extremely concise. Sacrifice grammar for concision." is left, because a first run
+compressed a schema finding into "code is optional on every item that has one, so some may exist with none",
+which the reader has to solve rather than read. Rule 4 is also overridden: unresolved questions go through
+`AskUserQuestion` rather than a bullet list.
 
 ```
 MIT License

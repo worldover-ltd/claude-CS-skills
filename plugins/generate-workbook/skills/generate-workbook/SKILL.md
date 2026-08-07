@@ -99,10 +99,10 @@ Done when the user confirms one repo.
 
 Build the **app schema** from that repo, per the same reference file.
 
-Then write it back to the user as a short list — entity, one sentence, what it links to — so they can
-correct you before it drives the rest of the run.
+Then put it back to the user as a table — entity, one sentence, what it links to — and ask them to confirm
+or correct it, since it drives the rest of the run.
 
-Done when every entity in `APP_SCHEMA.md` carries all four parts, and the user has seen the list.
+Done when every entity carries all four parts and the user has confirmed or corrected what you read back.
 
 # Step 4 — collect the source files
 
@@ -131,8 +131,8 @@ answer — "this column has 412 distinct values across 412 rows and the app stor
 materials, so I read it as the raw material code; confirm?" beats asking the user what the unique
 code is. The decisions are theirs; the digging is yours.
 
-Between questions, show the shape so far as a small markdown table per item — those render in the
-user's terminal where a diagram does not.
+Keep **the board** in front of them between questions — one row per source file, redrawn whole as each
+answer lands. `${CLAUDE_PLUGIN_ROOT}/docs/PRESENTING.md` holds what it carries.
 
 Done when the completion test in "### The mapping" holds for every item, with no field left untraced,
 no relationship left with an open end, and every app entity the customer has data for accounted for.

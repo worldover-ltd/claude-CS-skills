@@ -107,11 +107,11 @@ Extract the schema per that same reference, then read its "## The document side"
 `.workflow/active/${sessionId}/APP_SCHEMA.md`: which entities can hold documents, how a document attaches
 to one, which columns the app can look an existing item up by, and the app's own list of document types.
 
-Write it back to the user as a short list — which kinds of item can carry documents, what identifies each
-kind, and which document types the app knows — so they can correct you before it drives the rest of the
-run.
+Then put it back to the user as a table — which kinds of item can carry documents, what identifies each kind
+— and ask them to confirm or correct it, since it drives the rest of the run. Anything the app's own data
+does not tell you, say what it means for them rather than where you looked.
 
-Done when all four are recorded and the user has seen the list.
+Done when all four are recorded and the user has confirmed or corrected what you read back.
 
 # Step 4 — map the tree
 
@@ -125,12 +125,13 @@ been opened.
 
 Reach a verdict on the tree per that same reference.
 
-**Legible** — put your reading to the user before acting on it, one branch at a time: a markdown table
-giving the kind of item you take it to hold, the app entity that is, what identifies each item with two or
-three real names from the folders as evidence, the document type level if there is one, and the item and
-document counts. Then ask them to confirm or correct that branch, the entity choices offered as options
-rather than making them recall the app's vocabulary. Write each confirmed branch into `MAPPING.md` as it
-lands.
+**Legible** — put your reading to the user before acting on it, as **the board**: one row per branch, every
+cell you have not settled still a `?`. Carry two or three real folder names as the evidence for each
+identifier, so they are checking your reading against something rather than taking it on trust.
+
+Then work down it one branch at a time, asking them to confirm or correct that row, the entity choices
+offered as options rather than making them recall the app's vocabulary. Redraw the board as each answer
+lands and write the confirmed branch into `MAPPING.md`.
 
 **Illegible** — stop, and hand back something they can act on: which folders you could not resolve and
 what was missing in each, what a legible tree looks like for their case (one folder per item, named with
