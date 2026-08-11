@@ -69,7 +69,9 @@ they are what a correction has to preserve:
 - **It expects the files later, not now.** A row carries `file_sha` and `file_name`. Nothing in the
   workbook points into storage, because at migration time the file is not there yet.
 - **It reads the app's own vocabulary.** Sheet names, column names and document template names are matched
-  against the app's schema, which is why every run reads the customer's repo before writing anything.
+  against the app's schema, so a run works from that vocabulary rather than the customer's wording —
+  `generate-workbook` reads it out of the app's repo, and `generate-document-upload-workbook` is given it by
+  the user. Either way, a name the app does not have resolves to nothing.
 
 The layout that satisfies these is
 `${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/references/DOCUMENT_WORKBOOK_FORMAT.md`

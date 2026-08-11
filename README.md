@@ -37,12 +37,15 @@ current working directory.
 
 ### `generate-workbook`
 
-**Work in progress.** Two skills that build the workbook a Worldmaker app agent migrates from. Both read
-the customer's app repo first, so the workbook is written in the app's own vocabulary.
+**Work in progress.** Two skills that build the workbook a Worldmaker app agent migrates from, each written
+in the app's own vocabulary — `generate-workbook` reads that vocabulary out of the app's repo, and
+`generate-document-upload-workbook` is given it by you.
 
-Needs Python with `openpyxl`, and `gh` authenticated against the `WorldoverProd` organisation. Runs on
-macOS, Linux and Windows. Intermediate and output files are written under `.workflow/active/<sessionId>/`
-in your current working directory.
+Needs the `extract-document-text` plugin installed alongside it, since both skills call it. Then
+[`uv`](https://docs.astral.sh/uv/) to read the customer's files and Python with `openpyxl` to write the
+workbook. `generate-workbook` additionally needs `gh` authenticated against the `WorldoverProd`
+organisation; the document skill needs no repo access at all. Runs on macOS, Linux and Windows. Intermediate
+and output files are written under `.workflow/active/<sessionId>/` in your current working directory.
 
 Both skills share two things in `docs/`. `DOCUMENT_UPLOADING.md` is the Worldmaker stages that follow a run,
 which you do by hand: starting the migration with the finished workbook, then uploading the document files
@@ -63,12 +66,13 @@ Invoke it by running `/generate-workbook`, or ask Claude to "build a workbook fr
 
 **What it does**
 
-1. Preflights everything the run needs, in two parallel sub-agents — the document tooling via
-   `verify-document-skills-requirements`, and its own prerequisites (a Python with `openpyxl`, plus `gh`
-   access to the `WorldoverProd` repos) — and stops early if the latter aren't there.
+1. Preflights everything the run needs in a sub-agent — `uv`, a Python with `openpyxl`, and `gh` access to
+   the `WorldoverProd` repos — and stops early if any of the three is missing.
 2. Asks which customer and which app, resolves that to the app's repo, and reads the *app schema*
    out of it — the entities the app holds and how they relate.
-3. Collects the customer's source files (with your confirmation) and reads every one of them.
+3. Collects the customer's source files (with your confirmation), extracts the whole pile to Markdown via
+   `extract-document-text`, and reads what came out — profiling each spreadsheet so a candidate identifier
+   column is a count rather than an impression.
 4. Runs a grilling session to agree the *mapping* with you: which app entity each pile of data feeds,
    what identifies each item, which app field each column fills, and what has no home in the app yet.
 5. Publishes an artifact — an ER diagram plus a preview of every sheet with real sample rows — and
@@ -87,38 +91,50 @@ items already in the app".
 
 **What it does**
 
-1. Preflights the same prerequisites, then reads the app repo for the document side of its schema: which
-   kinds of item can hold documents, how one attaches, which document templates the app knows and how it
-   groups them into sections.
-2. Maps the folder you give it — *the tree* — and works out what each level of it means: which level names
-   the kind of item, which one identifies the item, which one names the type of document, and which is
-   noise.
-3. Puts that reading to you branch by branch, with real folder names as evidence and item counts to
-   check against.
-4. **Stops if the tree can't be read.** Folder names are the only evidence for which item a document
-   belongs to, and a guessed attachment is a document filed against the wrong substance. You get the exact
-   folders that failed and what would fix them.
-5. Hashes every document, since SHA-256 is how the upload screen matches a file to its row later — so
-   two documents called `SDS.pdf` in different item folders stay distinct.
-6. Takes each document's **template** — what kind of document it is — from its folder, and fans sub-agents
-   out to read only the documents whose folder doesn't say.
-7. Groups those templates into **sections** per kind of item, the way they'll sit on the item's page, and
-   puts the grouping to you to move, rename or merge.
-8. Publishes an artifact — the tree, the decisions per branch, the sections, real sample rows — and
-   iterates until you approve.
-9. Writes `DOCUMENT_UPLOAD_WORKBOOK.xlsx`: one row per attachment, carrying the item's identifier, the
-   document template, and the `file_name` / `file_sha` pair the migration looks for, plus a sheet each for
-   the templates and the sections.
+This skill reads no repo. Instead you give it the app's **vocabulary**: the customer's list of document
+templates, and the entity templates documents attach to — each with the sections on its page and which
+document templates sit in each section.
 
-Documents nothing could place are listed on the workbook's `README` sheet rather than dropped.
+**What it does**
+
+1. Preflights two prerequisites in a sub-agent — `uv` and a Python with `openpyxl` — and stops early if
+   either is missing.
+2. Asks you for the vocabulary and reads it back as two tables to correct, including the table name and
+   identifier column per entity, since those are what the workbook is built from.
+3. Maps the folder you give it — *the tree* — for the one thing reading a document can't recover: which
+   item each document belongs to. Levels are either the kind of item, the item's identifier, or noise.
+4. Puts that reading to you branch by branch, with real folder names as evidence and item counts to check
+   against, and **stops if the tree can't be read** — a guessed attachment is a document filed against the
+   wrong substance. You get the exact folders that failed and what would fix them.
+5. Hashes every document (SHA-256 is how the upload screen matches a file to its row later, so two files
+   called `SDS.pdf` in different item folders stay distinct), extracts them all to Markdown, resolves each
+   identifier **in code** from the branch rule, and cuts the work into batches of twenty.
+6. Fans out up to twenty sub-agents at once on Claude Haiku 4.5, one per batch. Each reads one JSON file and
+   returns, per document, the document template it is, the section that fits, a confidence score and a line
+   of evidence — then a script joins the answers back, re-sends silent batches, and rejects any template or
+   section name the app doesn't have.
+7. Publishes an artifact — the tree, the decisions per branch, the templates and sections actually used,
+   real sample rows, and the lowest-confidence rows worth spot-checking — and iterates until you approve.
+8. Writes `DOCUMENT_UPLOAD_WORKBOOK.xlsx`: one row per attachment, carrying the item's identifier, the
+   document template, the `file_name` / `file_sha` pair the migration looks for, and the confidence and
+   evidence behind the classification — plus a sheet each for the templates and the sections.
+
+Documents nothing could place are listed on the workbook's `README` sheet with the reason, rather than
+dropped.
 
 ### `categorise-documents`
 
 Give every file in a list its document type. One job, so anything that has already collected a pile of
-documents can hand them over: `generate-document-upload-workbook` calls it for the documents whose folder
-name doesn't say what they are.
+documents can hand them over. Nothing in this repo calls it today —
+`generate-document-upload-workbook` used to, and now classifies documents itself against the app's own
+template list — so reach for it directly, or from your own skills, when you want types out of a pile of files
+and nothing else.
 
 Invoke it by running `/categorise-documents`, or ask Claude to "sort these documents by type".
+
+Documents go through `extract-document-text` first — so that plugin needs to be installed alongside this
+one — and a sub-agent then reads a document's Markdown, or the rendered page of a scan, rather than the file
+itself. That is both cheaper and the only way a scanned page gets read at all.
 
 Categories come from a vocabulary the caller passes — the app's own document type list, usually — falling
 back to a built-in taxonomy of ~280 cosmetics, chemical and compliance document types. Reading is fanned
@@ -131,24 +147,34 @@ vocabulary come back marked `invented` rather than forced into the nearest categ
 Input and output are two files in the run's session directory, `TO_CATEGORISE.json` and
 `CATEGORIES.json`, joined on the document's path.
 
-### `verify-document-skills-requirements`
+### `extract-document-text`
 
-Checks this machine can actually read the customer's file types before a run depends on it. Installs
-Anthropic's official [document skills](https://github.com/anthropics/skills) (`xlsx`, `docx`, `pdf`)
-if they aren't present, reads what each one declares it needs, then probes every tool for real. Missing
-tooling is reported as the file types it blocks, with a pointer to the engineering team.
+Turn a pile of document files into Markdown an agent can read. Everything the other skills read goes
+through this one: `generate-workbook` for the customer's source files, `categorise-documents` for the
+documents it has to identify.
 
-Each probe *exercises* the capability rather than importing it — a wrapper around a missing system binary
-imports cleanly and dies on first use, which is exactly the trap worth catching. Installing anything is
-put to you first, so a preflight never quietly rebuilds your Python.
+Invoke it by running `/extract-document-text`, or ask Claude to "extract these documents".
 
-Runs its probing in a sub-agent and returns just the verdict, so the calling run's context stays clear.
+The engine is [MarkItDown](https://github.com/microsoft/markitdown), which covers PDF, Word, Excel,
+PowerPoint, Outlook messages, HTML, CSV, JSON, XML, EPub and ZIP. It runs on your machine and sends
+nothing anywhere.
 
-Invoke it by running `/verify-document-skills-requirements`. `generate-workbook` calls it in its
-preflight step.
+**Setup is one thing:** [`uv`](https://docs.astral.sh/uv/). It installs into your own home directory
+without administrator rights, and the extraction script declares its own libraries inline — so `uv`
+fetches those (and a Python, if this machine has none) on the first run and nothing else is ever installed.
 
-Requirement lists are read from the installed skills at run time rather than copied here, so they stay
-correct as Anthropic updates them.
+**Scanned PDFs are handled rather than skipped.** A page with no text layer converts to nothing, so those
+pages are rendered to PNGs and read as images instead — the first page by default, since one page is
+usually enough to tell what a document is, and every page on request. Rendering goes through `pypdfium2`,
+which needs no system binary, so it works where OCR through Tesseract can't be installed at all.
+
+Input is a folder or a JSON list of paths; output is `EXTRACTED.json` plus an `extracted/` folder, both in
+whichever directory you point it at. Every file in the manifest carries a `kind` — `text`, `image-only`,
+`sparse-text`, `image`, `empty`, `unsupported`, `failed` or `missing` — recording what came of it and where
+its content ended up.
+
+It is a tool rather than a procedure: it converts what it is given and reports what it did, and what to do
+with the result is the caller's.
 
 ### `data-site`
 
@@ -183,9 +209,9 @@ plugins/
   categorise-documents/
     .claude-plugin/plugin.json
     skills/categorise-documents/                 # SKILL.md + references/ + lib/
-  verify-document-skills-requirements/
+  extract-document-text/
     .claude-plugin/plugin.json
-    skills/verify-document-skills-requirements/
+    skills/extract-document-text/       # SKILL.md + lib/extract_documents.py
   data-site/
     .claude-plugin/plugin.json
     skills/data-site/                 # SKILL.md + template/ (the React shell)

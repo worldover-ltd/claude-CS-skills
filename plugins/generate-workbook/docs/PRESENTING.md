@@ -46,7 +46,7 @@ Four kinds of word are yours rather than theirs, and each has a plain replacemen
 | Yours | Theirs |
 |---|---|
 | Step numbers, phase names | "before we build the spreadsheet", "when I read the documents" |
-| Files the run wrote — `APP_SCHEMA.md`, `TREE.json`, `MAPPING.md` | nothing; say the finding, not where you put it |
+| Files the run wrote — `APP_SCHEMA.md`, `TREE.json`, `MAPPING.md`, `BRANCHES.json`, `BATCHES.json`, `CLASSIFICATIONS.json` | nothing; say the finding, not where you put it |
 | Tables, columns, link tables, foreign keys, nullable, schema, rows | "kinds of item", "what identifies an item", "not every item has one" |
 | Libraries and binaries — `openpyxl`, Tesseract, LibreOffice | what they unblock: "reading spreadsheets", "reading scans" |
 

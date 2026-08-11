@@ -1,7 +1,8 @@
 # Reading the tree
 
 How to get from a folder of documents to a role for every level of it, and to a verdict on whether it is
-legible. Nothing here opens a document: every fact comes from folder names, file names and nesting.
+legible. Nothing here opens a document: the tree answers **which item**, and reading the documents answers
+what kind of document each one is.
 
 ## Walking it
 
@@ -20,23 +21,22 @@ level is ambiguous.
 
 ## Assigning the roles
 
-The four roles are in "### The tree" in `SKILL.md`. What tells them apart is repetition, measured against
+The three roles are in "### The tree" in `SKILL.md`. What tells them apart is repetition, measured against
 the level's own distinct-name count:
 
 - A level whose names are nearly all distinct, and whose count is in the order of the customer's item
   count, is the **anchor**. Codes, SKUs and long names sit here.
-- A level whose few names repeat across every branch is a **template level**. "SDS" appearing under 300
-  item folders is a kind of document, not an item. Where two such levels sit one inside the other, the
-  inner one is the template level and the outer one is the customer's own grouping of them — a section.
 - A level with a handful of names that each cover a large, disjoint chunk of the tree is an **entity
-  level**. Match its names against the entities recorded in `APP_SCHEMA.md`.
-- Anything left — dates, versions, "Final", "OLD", "scans", "to check" — is **noise**, and is recorded as
-  noise rather than quietly ignored, because the user is the one who knows whether an "OLD" folder should
-  be migrated at all.
+  level**. Match its names against `entityTemplates` in `APP_TEMPLATES.json`.
+- Everything else is **noise** for mapping purposes, including a level whose few names repeat across every
+  branch ("SDS" under 300 item folders). Such a level names a kind of document, and it is recorded as the
+  branch's `hintLevel` so the classifier sees it — a hint the document's contents can overrule. Dates,
+  versions, "Final", "OLD", "scans" and "to check" are recorded as plain noise, since the user is the one
+  who knows whether an "OLD" folder should be migrated at all.
 
 Check the anchor against the app rather than against your reading of it: its names have to look like values
-of a column the app can look an item up by. Anchor names that are `Doc1`, `Scan 2023`, `Client A` or
-`New folder (2)` identify nothing the app can find.
+of the `identifierColumn` the user gave for that entity. Anchor names that are `Doc1`, `Scan 2023`,
+`Client A` or `New folder (2)` identify nothing the app can find.
 
 When no folder level is the anchor, test the file names — documents sitting flat in one folder often carry
 the identifier themselves (`RM-0142_SDS_2026.pdf`). A file-name anchor is legible when the identifier can
@@ -48,24 +48,55 @@ merely somewhere inside, differently each time, is not.
 The tree is **legible** when all four hold:
 
 - every file in `TREE.json` sits under exactly one anchor value;
-- every anchor value looks like a value of the identifier column the app can look items up by;
+- every anchor value looks like a value of that entity's `identifierColumn`;
 - each anchor value names one item, not several — two items sharing a folder is an unresolved attachment,
   not a two-row one;
-- every branch reaches an entity in `APP_SCHEMA.md`.
+- every branch reaches an entity in `APP_TEMPLATES.json`.
 
 Anything else is **illegible**, and the failures worth naming separately are: files loose at the root with
 no folder above them, an anchor level whose names carry no identifier, one folder holding documents for
-several items, and a branch whose kind of item has no matching entity in the app.
+several items, and a branch whose kind of item the user did not give a template for.
 
 A tree can be legible in part. Report it that way — branch by branch, with counts — rather than as one
 verdict over the whole folder, since a customer who organised half their documents well should not have to
 redo the half that was already fine.
 
-## Reporting an illegible branch
+## Writing BRANCHES.json
 
-Give the user the folder path, the count of documents stranded under it, and which of the four conditions
-it failed, in the plainest form of it: "these 34 documents are in a folder called `Scan 2023`, and nothing
-in the folder names says which raw material they belong to". Then what a legible version looks like for
-their case — one folder per item, named with the code the app knows the item by — and the two moves they
-own: reorganise those folders and come back, or tell you which item each folder belongs to, recorded as
-user-supplied.
+The board the user confirmed, in the form `plan_batches.py` reads. One entry per branch, at
+`.workflow/active/${sessionId}/BRANCHES.json`:
+
+```json
+{
+  "branches": [
+    {
+      "pathPrefix": "Raw Materials/",
+      "entity": "Raw Material",
+      "identifier": { "type": "folderLevel", "level": 2 },
+      "hintLevel": 3
+    },
+    {
+      "pathPrefix": "Products/Flat/",
+      "entity": "Product",
+      "identifier": { "type": "fileName", "pattern": "^(PRD-\\d{4})" }
+    }
+  ]
+}
+```
+
+- **`pathPrefix`** — matched against each file's path relative to the folder the user gave. The branch with
+  the longest matching prefix wins, so a general branch and a more specific one can coexist. One branch
+  covering the whole tree uses `""`.
+- **`entity`** — the `entityTemplates` name in `APP_TEMPLATES.json`. A name that is not there stops the
+  script rather than producing a sheet the migration cannot place.
+- **`identifier`** — how to get the item's identifier out of a path, in one of two forms:
+  - `{"type": "folderLevel", "level": N}` — the Nth folder level, counting from 1 at the top of the
+    relative path. `Raw Materials/RM-0142/SDS.pdf` at level 2 yields `RM-0142`.
+  - `{"type": "fileName", "pattern": "<regex>"}` — matched against the file name; the first capture group
+    is the identifier, or the whole match where the pattern has no group. Escape backslashes for JSON
+    (`\\d`), and prefer anchoring the pattern at the start.
+- **`hintLevel`** — optional. The folder level whose names look like kinds of document, passed to the
+  classifier as `folderHint`. Leave it out where no level does.
+
+Write the rule rather than the values: `plan_batches.py` applies it to every path and reports the documents
+it yields nothing for, which catches the branch whose anchor is one level off across a whole folder.
