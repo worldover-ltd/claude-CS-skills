@@ -68,21 +68,18 @@ The mapping is complete when all four hold for **every** item the customer has d
 
 ### Process
 
-# Step 1 — preflight, in parallel
+# Step 1 — preflight
 
-The user may be on macOS, Linux or Windows, so nothing here is assumed. Send **both sub agents in a
-single message**, briefed per
-`${CLAUDE_PLUGIN_ROOT}/skills/generate-workbook/references/PREFLIGHT.md`, and read their answers
-together. The customer's files arrive as spreadsheets, Word documents and PDFs, and Anthropic's
-official document skills are what read them in Step 5.
+The user may be on macOS, Linux or Windows, so nothing here is assumed. Send **one sub agent**, briefed
+per `${CLAUDE_PLUGIN_ROOT}/skills/generate-workbook/references/PREFLIGHT.md`, to settle three things:
+`uv`, which is what reads the customer's files in Step 5; a Python with `openpyxl`, which is what writes
+the workbook in Step 8; and `gh` access to the customer's repo.
 
-- **Python or repo access missing** — stop here, as that reference describes, and wait for the user to
-  come back with it.
-- **Document tooling partial** — workable. Carry forward which file types are covered; the rest become
-  files the user describes to you in Step 5. Tell them which ones, and that engineering can fix it.
+Any of the three missing stops the run, as that reference describes. Tell the user which one and what it
+blocks, and wait for them to come back with it.
 
-Done when both sub agents have reported, the interpreter name is recorded, repo access is confirmed,
-and the covered file types are known.
+Done when the sub agent has reported, the `uv` command and the interpreter name are recorded, and repo
+access is confirmed.
 
 # Step 2 — find the customer's app
 
@@ -114,10 +111,12 @@ Done when the user confirms the list.
 
 # Step 5 — read what is in them
 
-Read every source file and note what each one holds: item names, headers, tab names, row counts,
-which fields look unique, and which app entity it appears to feed. Follow
+Extract the whole pile in one pass with the `extract-document-text` skill, then read what came out and
+note what each file holds: item names, headers, tab names, row counts, which fields look unique, and
+which app entity it appears to feed. Follow
 `${CLAUDE_PLUGIN_ROOT}/skills/generate-workbook/references/EXTRACTING_SOURCES.md` for zips, Excel
-files, Word documents, PDFs and scans.
+files, Word documents, PDFs and scans — including which files came back unreadable, and what to ask the
+user about each.
 
 Done when every source file is either read or reported to the user as unreadable with the reason.
 

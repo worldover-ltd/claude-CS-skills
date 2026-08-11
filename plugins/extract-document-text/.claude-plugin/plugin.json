@@ -1,0 +1,10 @@
+{
+  "name": "extract-document-text",
+  "version": "0.1.0",
+  "description": "Turn document files into Markdown an agent can read, using MarkItDown under uv, and render the pages of scanned PDFs that hold no text.",
+  "author": {
+    "name": "Frederico Correia",
+    "email": "frederico.correia@worldover.io"
+  },
+  "keywords": ["documents", "extraction", "markitdown", "uv", "pdf", "docx", "xlsx", "scans"]
+}

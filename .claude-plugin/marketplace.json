@@ -31,11 +31,11 @@
       "keywords": ["documents", "categorize", "taxonomy", "workflow", "regulatory"]
     },
     {
-      "name": "verify-document-skills-requirements",
-      "source": "./plugins/verify-document-skills-requirements",
-      "description": "Install Anthropic's official document skills if absent, then probe every tool they require on this system and report what is missing.",
+      "name": "extract-document-text",
+      "source": "./plugins/extract-document-text",
+      "description": "Turn document files into Markdown an agent can read, using MarkItDown under uv, and render the pages of scanned PDFs that hold no text.",
       "category": "productivity",
-      "keywords": ["preflight", "requirements", "documents", "xlsx", "pdf", "docx"]
+      "keywords": ["documents", "extraction", "markitdown", "uv", "pdf", "docx", "xlsx", "scans"]
     },
     {
       "name": "data-site",

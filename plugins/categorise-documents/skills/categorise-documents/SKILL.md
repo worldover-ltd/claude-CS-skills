@@ -75,18 +75,26 @@ as the default.
 Done when `TO_CATEGORISE.json` holds at least one document, every `path` in it exists on disk, and the
 vocabulary is settled.
 
-# Step 2 — check what can be read
+# Step 2 — extract what they hold
 
-The documents arrive as PDFs, Word files, spreadsheets and images, and Anthropic's official document
-skills are what read them. A caller that has already run
-`verify-document-skills-requirements` passes its verdict in; otherwise invoke that skill in a sub agent
-and read the verdict yourself.
+The documents arrive as PDFs, Word files, spreadsheets and images. A sub agent handed a PDF spends its
+context on the file itself; handed the Markdown of it, it spends a fraction — and a scan it could not have
+read at all becomes a PNG it can. So everything is extracted before anything is categorised.
 
-Group the input by extension and compare against the covered types. Documents whose type is not covered
-skip the reading entirely and come back as `unknown` — tell the caller which ones and why, since guessing
-from a file name is what the `unknown` marker exists to avoid.
+Invoke the `extract-document-text` skill, giving it `TO_CATEGORISE.json` itself as its input — that file's
+shape is one the extraction takes — and `.workflow/active/${sessionId}` as its output directory. It writes
+`EXTRACTED.json` there, one record per document under the same `path`, each carrying a `kind`.
 
-Done when every extension in the input is either covered or recorded as uncovered.
+Join the two on `path` and turn each `kind` into that document's `readFrom`: the files a sub agent opens, as
+the extraction's contract defines them for that kind. Only a document's identity is asked here, so the
+first rendered page of a scan is enough.
+
+A `kind` that leaves nothing to read — `unsupported`, `failed` — skips the fan-out and comes back
+`unknown`, named to the caller with the reason. The `unknown` marker exists so that every category traces
+to something read.
+
+Done when every document in `TO_CATEGORISE.json` either carries at least one file in `readFrom` or is
+already marked `unknown` with a reason.
 
 # Step 3 — read them
 

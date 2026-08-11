@@ -16,7 +16,9 @@ already:
 
 1. Read `TO_CATEGORISE.json` and record its document count as `N` — this is the roll call's authority.
 2. Take the template below and replace each placeholder with a literal value:
-   - `__DOCUMENTS_JSON__` → the documents array, as a JSON literal
+   - `__DOCUMENTS_JSON__` → the documents array, as a JSON literal, each entry carrying its `path` and
+     the `readFrom` list Step 2 resolved for it — the extracted Markdown, the rendered pages, or the image
+     itself. A document with nothing to read never reaches the script; it is already `unknown`.
    - `__VOCABULARY_JSON__` → the vocabulary array, as a JSON literal (`[]` when falling back to the
      taxonomy)
    - `__TAXONOMY_PATH__` → the absolute path to `lib/document_categories.txt`
@@ -85,9 +87,11 @@ const vocabularySection = vocabulary.length
 const promptFor = (batch) => `
 ### DOCUMENTS
 
-Read exactly these ${batch.length} files and no others. Use each path verbatim as "path" in your output:
+Work on exactly these ${batch.length} documents and no others. Each one has already been extracted, so
+read the file(s) listed under it rather than the document itself. Use the "document" value verbatim as
+"path" in your output:
 
-${batch.map((d, i) => `${i + 1}. ${d.path}`).join('\n')}
+${batch.map((d, i) => `${i + 1}. document: ${d.path}\n   read: ${(d.readFrom ?? []).join('\n         ')}`).join('\n')}
 
 ### VOCABULARY
 
@@ -95,13 +99,14 @@ ${vocabularySection}
 
 ### WHAT TO RETURN
 
-For each file above, open it, work out what kind of document it is, and return one result:
+For each document above, read what is listed under it, work out what kind of document it is, and return
+one result:
 - "category" — the name you picked, and "source": "vocabulary".
 - Nothing in the list fits — invent a name of at most 40 characters and set "source": "invented".
-- The file cannot be read, or its contents place it nowhere — set "category" to "unknown" and
-  "source": "unknown".
+- Nothing listed could be read, or its contents place the document nowhere — set "category" to "unknown"
+  and "source": "unknown".
 
-Return one result for EVERY file listed above. "path" MUST equal the listed path exactly.
+Return one result for EVERY document listed above. "path" MUST equal its "document" value exactly.
 `
 
 async function readRound(batch_documents, phase) {
