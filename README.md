@@ -7,14 +7,15 @@ document and compliance workflows.
 
 ```
 /plugin marketplace add worldover-ltd/claude-CS-skills
-/plugin install generate-workbook
+/plugin install customer-service-skills
+/plugin install util-skills
 ```
 
 Then restart Claude Code (or reload plugins) when prompted.
 
 ## Plugins
 
-### `generate-workbook`
+### `customer-service-skills`
 
 One skill, `generate-document-upload-workbook`, which builds the workbook a Worldmaker app agent
 migrates from — written in the app's own vocabulary, which you give it.
@@ -26,7 +27,7 @@ are uploaded at the end, out of the migration.
 Invoke it by running `/generate-document-upload-workbook`, or ask Claude to "assign these documents to the
 items already in the app".
 
-Needs the `extract-document-text` plugin installed alongside it, since the skill calls it. Then
+Needs the `util-skills` plugin installed alongside it, since the skill calls `extract-document-text`. Then
 [`uv`](https://docs.astral.sh/uv/) to read the customer's documents and Python with `openpyxl` to write the
 workbook. It needs no repo access at all. Runs on macOS, Linux and Windows. Intermediate and output files
 are written under `.workflow/active/<sessionId>/` in your current working directory.
@@ -72,10 +73,13 @@ Then:
 Documents nothing could place are listed on the workbook's `README` sheet with the reason, rather than
 dropped.
 
-### `extract-document-text`
+### `util-skills`
 
-Turn a pile of document files into Markdown an agent can read. Everything the other skills read goes
-through this one — `generate-document-upload-workbook` for the documents it has to classify.
+Building blocks other skills call, rather than a job of their own. One skill so far,
+`extract-document-text`.
+
+It turns a pile of document files into Markdown an agent can read. Everything the other skills read goes
+through it — `generate-document-upload-workbook` for the documents it has to classify.
 
 Invoke it by running `/extract-document-text`, or ask Claude to "extract these documents".
 
@@ -105,12 +109,12 @@ with the result is the caller's.
 ```
 .claude-plugin/marketplace.json     # marketplace manifest (lists plugins)
 plugins/
-  generate-workbook/
+  customer-service-skills/
     .claude-plugin/plugin.json                   # plugin manifest
     docs/                                        # the upload journey, and how a run talks to you
     vendor/                                      # MIT copies of third-party skills, used as references
     skills/generate-document-upload-workbook/    # SKILL.md + references/ + lib/
-  extract-document-text/
+  util-skills/
     .claude-plugin/plugin.json
     skills/extract-document-text/       # SKILL.md + lib/extract_documents.py
 ```
