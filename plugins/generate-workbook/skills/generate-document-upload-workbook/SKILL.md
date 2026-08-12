@@ -32,7 +32,7 @@ any files. Reuse the same `${sessionId}` for every file in the run.
 
 Files inside this plugin are referenced with `${CLAUDE_PLUGIN_ROOT}`, set by Claude Code when the plugin
 is installed. Running from a raw checkout instead, treat it as the plugin root — the folder containing
-this `skills/` directory. Some of those files live under the sibling `generate-workbook` skill.
+this `skills/` directory.
 
 The user may be on macOS, Linux or Windows, and the shell differs with them. Write every path with
 forward slashes, quote any that could contain a space, and keep each command on a single line — a
@@ -95,9 +95,9 @@ guessed attachment is a document filed against the wrong substance, which is wor
 # Step 1 — preflight
 
 Send **one sub agent**, briefed per
-`${CLAUDE_PLUGIN_ROOT}/skills/generate-workbook/references/PREFLIGHT.md`, to settle two of its three
-questions: `uv`, which reads the documents in Step 5, and a Python with `openpyxl`, which writes the
-workbook in Step 8. This skill needs no repo access — tell the sub agent to skip that question.
+`${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/references/PREFLIGHT.md`, to settle its
+two questions: `uv`, which reads the documents in Step 5, and a Python with `openpyxl`, which writes the
+workbook in Step 8.
 
 Either one missing stops the run, as that reference describes: tell the user which and what it blocks,
 then wait.

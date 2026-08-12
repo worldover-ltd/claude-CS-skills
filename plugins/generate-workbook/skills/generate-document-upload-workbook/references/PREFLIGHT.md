@@ -1,15 +1,16 @@
 # Preflight
 
-What a preflight step settles before a run commits to anything, and what it returns. Three questions,
-all of them cheap, and each answered by a command that actually runs. It goes to **one sub agent**: the
+What a preflight step settles before a run commits to anything, and what it returns. Two questions, both
+of them cheap, and each answered by a command that actually runs. It goes to **one sub agent**: the
 probing produces output that matters only until it reaches a verdict, and a sub agent keeps that out of
 the run's context.
 
-A caller that needs only some of them says which when it briefs the sub agent.
+This skill reads documents and writes a workbook, and touches no repo — so neither question asks about
+one.
 
-## The three questions
+## The two questions
 
-- **`uv`** — `uv --version`. This is what reads the customer's files: the `extract-document-text` skill
+- **`uv`** — `uv --version`. This is what reads the customer's documents: the `extract-document-text` skill
   runs MarkItDown under it. Where it is missing, its "### Setup" holds the installer, which needs no
   administrator rights. It returns the `uv` command that worked, by name or by full path, since a shell
   opened before the install will not have it on `PATH` yet.
@@ -18,18 +19,16 @@ A caller that needs only some of them says which when it briefs the sub agent.
   the library is missing, `<interpreter> -m pip install openpyxl` is worth one attempt; a refusal that
   the environment is externally managed is a system Python saying no, and is engineering's to sort out.
   It returns the interpreter name, which every later command in the run uses.
-- **Repo access** — whether `gh repo list WorldoverProd --limit 1` returns a repo, which is how the app
-  schema step reaches the customer's app.
 
 ## Reading the verdict
 
-Any of the three missing stops the run, because each one blocks a different half of it: no `uv` and the
-customer's files cannot be read, no `openpyxl` and no workbook can be written, no repo access and the app's
-own vocabulary is out of reach.
+Either one missing stops the run, because each blocks a different half of it: no `uv` and the customer's
+documents cannot be read, so nothing can be classified; no `openpyxl` and no workbook can be written, so
+there is nothing to hand over.
 
 Tell the user which one it was, in terms of what it costs rather than what is absent, and that someone on
-the engineering team can set it up — `uv`, a Python with `openpyxl`, or access to the `WorldoverProd`
-GitHub organisation. Then wait for them to come back with it.
+the engineering team can set it up — `uv`, or a Python with `openpyxl`. Then wait for them to come back
+with it.
 
 Whether a given *file type* can be read is settled per file as it is extracted, and `EXTRACTED.json` carries
-that **verdict**. So this step confirms the three commands and leaves file types to the run that meets them.
+that **verdict**. So this step confirms the two commands and leaves file types to the run that meets them.

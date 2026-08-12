@@ -92,9 +92,20 @@ somebody has to create it in the app before the migration runs.
 - Every document in `DOCUMENTS.json` is in exactly one place: a data sheet row, or the `README` exception
   list. Counts across the two add up to the file count `map_tree.py` reported.
 
-## Human-readable finish, and writing it
+## Human-readable finish
 
-Both are as `${CLAUDE_PLUGIN_ROOT}/skills/generate-workbook/references/WORKBOOK_FORMAT.md` describes —
-frozen bold header, autofilter, fitted column widths, and a `build_workbook.py` in the session directory
-that is run rather than a workbook written cell by cell. Add one thing to its checks: load the file back
-and confirm the four conditions above.
+Apply to every data sheet: freeze the header row, bold it, turn on the autofilter, and set column widths
+to fit their content. This costs a few lines and is what makes the file usable by the person who has to
+check it.
+
+## Writing it
+
+Write the file with `openpyxl`, under whichever interpreter the preflight step resolved. Keep the script
+at `.workflow/active/${sessionId}/build_workbook.py` and generate the workbook by running it, rather than
+writing cells one at a time — a correction then costs a re-run.
+
+The script has to run wherever the user is, so build paths with `pathlib` rather than joining strings,
+and pass `encoding="utf-8"` on every text file you open — the default differs by platform and silently
+mangles accented names on Windows.
+
+Before handing over, load the file back and confirm the four conditions above.
