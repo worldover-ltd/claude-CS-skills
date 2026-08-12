@@ -7,33 +7,12 @@ document and compliance workflows.
 
 ```
 /plugin marketplace add worldover-ltd/claude-CS-skills
-/plugin install assign-documents
+/plugin install generate-workbook
 ```
 
 Then restart Claude Code (or reload plugins) when prompted.
 
 ## Plugins
-
-### `assign-documents`
-
-Categorize a set of documents and assign each one to an item found in a source of Excel
-files, then produce a consolidated Excel report. Built for cosmetics, chemicals and other
-substance-based industries.
-
-Invoke it by running `/assign-documents`, or just ask Claude to "categorize these documents"
-or "match these documents to items in this spreadsheet".
-
-**What it does**
-
-1. Collects the document files and the source Excel file(s) (with your confirmation).
-2. Learns the structure of the Excel files and groups them by type.
-3. Asks which items to assign documents to, and which tab/columns identify each item.
-4. Fans out sub-agents to read each document, match it to an Excel row, and categorize it
-   against a built-in taxonomy (`lib/document_categories.txt`).
-5. Writes `ASSIGNED_DOCUMENTS.xlsx` into the run's session directory.
-
-Intermediate and output files are written under `.workflow/active/<sessionId>/` in your
-current working directory.
 
 ### `generate-workbook`
 
@@ -122,36 +101,11 @@ document templates sit in each section.
 Documents nothing could place are listed on the workbook's `README` sheet with the reason, rather than
 dropped.
 
-### `categorise-documents`
-
-Give every file in a list its document type. One job, so anything that has already collected a pile of
-documents can hand them over. Nothing in this repo calls it today —
-`generate-document-upload-workbook` used to, and now classifies documents itself against the app's own
-template list — so reach for it directly, or from your own skills, when you want types out of a pile of files
-and nothing else.
-
-Invoke it by running `/categorise-documents`, or ask Claude to "sort these documents by type".
-
-Documents go through `extract-document-text` first — so that plugin needs to be installed alongside this
-one — and a sub-agent then reads a document's Markdown, or the rendered page of a scan, rather than the file
-itself. That is both cheaper and the only way a scanned page gets read at all.
-
-Categories come from a vocabulary the caller passes — the app's own document type list, usually — falling
-back to a built-in taxonomy of ~280 cosmetics, chemical and compliance document types. Reading is fanned
-out in batches of ten, driven by a workflow script when there are enough documents to be worth it.
-
-Nothing is quietly dropped: every document that goes out to a sub-agent has to answer, silent ones are
-sent again, and whatever is still missing comes back marked `unread`. Documents that fit nothing in the
-vocabulary come back marked `invented` rather than forced into the nearest category.
-
-Input and output are two files in the run's session directory, `TO_CATEGORISE.json` and
-`CATEGORIES.json`, joined on the document's path.
-
 ### `extract-document-text`
 
 Turn a pile of document files into Markdown an agent can read. Everything the other skills read goes
-through this one: `generate-workbook` for the customer's source files, `categorise-documents` for the
-documents it has to identify.
+through this one: `generate-workbook` for the customer's source files, and
+`generate-document-upload-workbook` for the documents it has to classify.
 
 Invoke it by running `/extract-document-text`, or ask Claude to "extract these documents".
 
@@ -176,45 +130,20 @@ its content ended up.
 It is a tool rather than a procedure: it converts what it is given and reports what it did, and what to do
 with the result is the caller's.
 
-### `data-site`
-
-Display a dataset as a site you can click through instead of a table in chat: an icon rail of big
-concepts, a nav panel of lists inside each one, a table per list, and a detail page per row with
-field blocks and document-style item lists.
-
-The plugin ships a finished React app — the shell — that renders whatever a JSON config describes.
-A run copies the shell into your working directory, writes the config from your data, and bundles
-everything into one self-contained `bundle.html`. The config is validated with Zod first, so a bad
-field is reported as a JSON path rather than a blank page.
-
-Invoke it by running `/data-site`, or ask Claude to "show this data as a site".
-
-Needs Node with npm. The shell lives at `plugins/data-site/skills/data-site/template`; each run
-edits its own copy, never that folder.
-
 ## Repo layout
 
 ```
 .claude-plugin/marketplace.json     # marketplace manifest (lists plugins)
 plugins/
-  assign-documents/
-    .claude-plugin/plugin.json       # plugin manifest
-    skills/assign-documents/         # the skill itself (SKILL.md + supporting files)
   generate-workbook/
-    .claude-plugin/plugin.json
+    .claude-plugin/plugin.json                   # plugin manifest
     docs/                                        # shared across the plugin's skills
     vendor/                                      # MIT copies of third-party skills, used as references
     skills/generate-workbook/                    # SKILL.md + references/ + lib/
     skills/generate-document-upload-workbook/    # SKILL.md + references/ + lib/
-  categorise-documents/
-    .claude-plugin/plugin.json
-    skills/categorise-documents/                 # SKILL.md + references/ + lib/
   extract-document-text/
     .claude-plugin/plugin.json
     skills/extract-document-text/       # SKILL.md + lib/extract_documents.py
-  data-site/
-    .claude-plugin/plugin.json
-    skills/data-site/                 # SKILL.md + template/ (the React shell)
 ```
 
 ## License

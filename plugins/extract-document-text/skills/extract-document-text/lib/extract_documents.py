@@ -13,7 +13,7 @@ Usage:
         [--scale 2.0] [--max-pages 40] [--enhance] [--jobs 4] [--force]
 
 <folder-or-json> is a folder to walk, or a JSON file holding either a list of paths or
-{"documents": [{"path": ...}]} — the shape categorise-documents already passes around.
+{"documents": [{"path": ...}]}.
 
 Writes text to <out_dir>/extracted/<slug>.md, page images to <out_dir>/extracted/<slug>/page_NNN.png,
 and one record per input file to <out_dir>/EXTRACTED.json.
