@@ -12,7 +12,7 @@
     {
       "name": "customer-service-skills",
       "source": "./plugins/customer-service-skills",
-      "description": "Skills for the Customer Service team. Holds generate-document-upload-workbook, which builds the workbook that attaches a folder of documents onto items that already exist in a Worldmaker app, reading each document to decide what kind of document it is.",
+      "description": "Skills for the Customer Service team. Holds upload-documents, which builds the workbook that attaches a folder of documents onto items that already exist in a Worldmaker app, reading each document to decide what kind of document it is.",
       "category": "productivity",
       "keywords": ["excel", "workbook", "migration", "upload", "documents"]
     },

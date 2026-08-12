@@ -1,6 +1,6 @@
 ---
-name: generate-document-upload-workbook
-description: "Build the workbook that attaches a folder of documents onto items that already exist in a Worldmaker app, reading each document to decide what kind of document it is. Triggers on \"generate-document-upload-workbook\", or when the user wants documents assigned to existing items for a migration."
+name: upload-documents
+description: "Build the workbook that attaches a folder of documents onto items that already exist in a Worldmaker app, reading each document to decide what kind of document it is. Triggers on \"upload-documents\", or when the user wants documents assigned to existing items for a migration."
 allowed-tools: Agent, Skill, AskUserQuestion, TodoWrite, Read, Write, Edit, Bash, Glob, Grep, Artifact
 ---
 
@@ -91,7 +91,7 @@ guessed attachment is a document filed against the wrong substance, which is wor
 # Step 1 — preflight
 
 Send **one sub agent**, briefed per
-`${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/references/PREFLIGHT.md`, to settle its
+`${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/references/PREFLIGHT.md`, to settle its
 two questions: `uv`, which reads the documents in Step 5, and a Python with `openpyxl`, which writes the
 workbook in Step 8.
 
@@ -117,7 +117,7 @@ carrying a `table` and an `identifierColumn`, and the user has confirmed the tab
 # Step 3 — map the tree
 
 Ask the user for the folder of documents, then map it with
-`${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/references/READING_THE_TREE.md`.
+`${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/references/READING_THE_TREE.md`.
 
 Done when `TREE.json` holds every file under the folder, its summary has been read, and no document has
 been opened.
@@ -153,7 +153,7 @@ Three mechanical passes, in order. Each writes a file the next one reads.
 matches on later — names collide between item folders and paths change, the hash does neither.
 
 ```sh
-<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/lib/hash_documents.py" "<folder>" ".workflow/active/${sessionId}"
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/hash_documents.py" "<folder>" ".workflow/active/${sessionId}"
 ```
 
 That writes `DOCUMENTS.json`, and reports the same file filed under more than one item — one document
@@ -166,7 +166,7 @@ with the Markdown or rendered pages a classifier can read.
 **Batch.** Join the three files and cut the work into batches:
 
 ```sh
-<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/lib/plan_batches.py" ".workflow/active/${sessionId}"
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/plan_batches.py" ".workflow/active/${sessionId}"
 ```
 
 That resolves each document's identifier value from its branch rule, pairs it with what to read, and
@@ -181,13 +181,13 @@ or on the reported exception list, and the user has seen that list.
 
 Each batch goes to one sub agent, which reads its input file and says, per document, which document
 template it is, which section fits, how confident it is, and the evidence for it. Follow
-`${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/references/CLASSIFYING_DOCUMENTS.md` —
+`${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/references/CLASSIFYING_DOCUMENTS.md` —
 it holds the prompt, the output shape, and the model to run them on.
 
 Then reconcile in code rather than by eye:
 
 ```sh
-<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/lib/collect_classifications.py" ".workflow/active/${sessionId}"
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/collect_classifications.py" ".workflow/active/${sessionId}"
 ```
 
 That writes `CLASSIFICATIONS.json` and prints the roll call: how many documents answered, which batches
@@ -226,7 +226,7 @@ holds. Done when the user approves what the artifact shows.
 # Step 8 — write the workbook
 
 Build the Excel file per
-`${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/references/DOCUMENT_WORKBOOK_FORMAT.md`,
+`${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/references/DOCUMENT_WORKBOOK_FORMAT.md`,
 writing to `.workflow/active/${sessionId}/DOCUMENT_UPLOAD_WORKBOOK.xlsx`.
 
 Done when every document in `DOCUMENTS.json` appears either as a row in a data sheet or on the `README`

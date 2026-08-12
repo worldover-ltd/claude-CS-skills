@@ -17,15 +17,15 @@ Then restart Claude Code (or reload plugins) when prompted.
 
 ### `customer-service-skills`
 
-One skill, `generate-document-upload-workbook`, which builds the workbook a Worldmaker app agent
-migrates from — written in the app's own vocabulary, which you give it.
+One skill, `upload-documents`, which builds the workbook a Worldmaker app agent migrates from —
+written in the app's own vocabulary, which you give it.
 
 Attach a folder of documents onto items that **already exist** in the app. The items are there and the
 documents are a folder on your computer; this builds the workbook that links the two. The files themselves
 are uploaded at the end, out of the migration.
 
-Invoke it by running `/generate-document-upload-workbook`, or ask Claude to "assign these documents to the
-items already in the app".
+Invoke it by running `/upload-documents`, or ask Claude to "assign these documents to the items already
+in the app".
 
 Needs the `util-skills` plugin installed alongside it, since the skill calls `extract-document-text`. Then
 [`uv`](https://docs.astral.sh/uv/) to read the customer's documents and Python with `openpyxl` to write the
@@ -79,7 +79,7 @@ Building blocks other skills call, rather than a job of their own. One skill so 
 `extract-document-text`.
 
 It turns a pile of document files into Markdown an agent can read. Everything the other skills read goes
-through it — `generate-document-upload-workbook` for the documents it has to classify.
+through it — `upload-documents` for the documents it has to classify.
 
 Invoke it by running `/extract-document-text`, or ask Claude to "extract these documents".
 
@@ -113,7 +113,7 @@ plugins/
     .claude-plugin/plugin.json                   # plugin manifest
     docs/                                        # the upload journey, and how a run talks to you
     vendor/                                      # MIT copies of third-party skills, used as references
-    skills/generate-document-upload-workbook/    # SKILL.md + references/ + lib/
+    skills/upload-documents/                     # SKILL.md + references/ + lib/
   util-skills/
     .claude-plugin/plugin.json
     skills/extract-document-text/       # SKILL.md + lib/extract_documents.py

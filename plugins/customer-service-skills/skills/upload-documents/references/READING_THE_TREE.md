@@ -7,7 +7,7 @@ what kind of document each one is.
 ## Walking it
 
 ```sh
-<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/lib/map_tree.py" "<folder>" ".workflow/active/${sessionId}"
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/map_tree.py" "<folder>" ".workflow/active/${sessionId}"
 ```
 
 That writes `TREE.json` — every file with its depth and its path split into parts — and prints the summary

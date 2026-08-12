@@ -23,7 +23,7 @@ stateDiagram-v2
 
 ## Map — the skill
 
-`generate-document-upload-workbook` builds the workbook, reading the assignment off the folder tree the
+`upload-documents` builds the workbook, reading the assignment off the folder tree the
 customer organised. It assumes the items are already in the app: the workbook attaches documents to them
 rather than creating them.
 
@@ -70,7 +70,7 @@ they are what a correction has to preserve:
   the user is the one who supplies it. A name the app does not have resolves to nothing.
 
 The layout that satisfies these is
-`${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/references/DOCUMENT_WORKBOOK_FORMAT.md`.
+`${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/references/DOCUMENT_WORKBOOK_FORMAT.md`.
 
 ## Where the user usually needs a hand
 
