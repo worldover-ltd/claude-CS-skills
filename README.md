@@ -16,8 +16,8 @@ Then restart Claude Code (or reload plugins) when prompted.
 
 ### `generate-workbook`
 
-**Work in progress.** One skill, `generate-document-upload-workbook`, which builds the workbook a
-Worldmaker app agent migrates from — written in the app's own vocabulary, which you give it.
+One skill, `generate-document-upload-workbook`, which builds the workbook a Worldmaker app agent
+migrates from — written in the app's own vocabulary, which you give it.
 
 Attach a folder of documents onto items that **already exist** in the app. The items are there and the
 documents are a folder on your computer; this builds the workbook that links the two. The files themselves

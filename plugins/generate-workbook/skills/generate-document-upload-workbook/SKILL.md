@@ -4,10 +4,6 @@ description: "Build the workbook that attaches a folder of documents onto items 
 allowed-tools: Agent, Skill, AskUserQuestion, TodoWrite, Read, Write, Edit, Bash, Glob, Grep, Artifact
 ---
 
-### Status
-
-Work in progress. The process below is a first pass and will change with use.
-
 ### Context
 
 The user is on the Customer Service team and is not a developer. How a run talks to them — what gets asked,
