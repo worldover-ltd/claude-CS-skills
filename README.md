@@ -16,17 +16,22 @@ Then restart Claude Code (or reload plugins) when prompted.
 
 ### `generate-workbook`
 
-**Work in progress.** Two skills that build the workbook a Worldmaker app agent migrates from, each written
-in the app's own vocabulary — `generate-workbook` reads that vocabulary out of the app's repo, and
-`generate-document-upload-workbook` is given it by you.
+**Work in progress.** One skill, `generate-document-upload-workbook`, which builds the workbook a
+Worldmaker app agent migrates from — written in the app's own vocabulary, which you give it.
 
-Needs the `extract-document-text` plugin installed alongside it, since both skills call it. Then
-[`uv`](https://docs.astral.sh/uv/) to read the customer's files and Python with `openpyxl` to write the
-workbook. `generate-workbook` additionally needs `gh` authenticated against the `WorldoverProd`
-organisation; the document skill needs no repo access at all. Runs on macOS, Linux and Windows. Intermediate
-and output files are written under `.workflow/active/<sessionId>/` in your current working directory.
+Attach a folder of documents onto items that **already exist** in the app. The items are there and the
+documents are a folder on your computer; this builds the workbook that links the two. The files themselves
+are uploaded at the end, out of the migration.
 
-Both skills share two things in `docs/`. `DOCUMENT_UPLOADING.md` is the Worldmaker stages that follow a run,
+Invoke it by running `/generate-document-upload-workbook`, or ask Claude to "assign these documents to the
+items already in the app".
+
+Needs the `extract-document-text` plugin installed alongside it, since the skill calls it. Then
+[`uv`](https://docs.astral.sh/uv/) to read the customer's documents and Python with `openpyxl` to write the
+workbook. It needs no repo access at all. Runs on macOS, Linux and Windows. Intermediate and output files
+are written under `.workflow/active/<sessionId>/` in your current working directory.
+
+Two more things live in `docs/`. `DOCUMENT_UPLOADING.md` is the Worldmaker stages that follow a run,
 which you do by hand: starting the migration with the finished workbook, then uploading the document files
 themselves from the warning on the migration card. `PRESENTING.md` is how a run talks to you — what it puts
 as a multiple-choice question rather than a paragraph, what it tables, and the three places it draws a
@@ -36,45 +41,11 @@ diagram. It sits on top of two vendored MIT skills in `vendor/`: `communication-
 Both are copies rather than dependencies, so there is nothing extra to install; `vendor/NOTICE.md` records
 the upstream commit and what was cut.
 
-#### `generate-workbook` — the data
-
-Build the upload workbook when the customer didn't supply one, out of whatever they did send — zips,
-spreadsheets, Word documents, PDFs, exports.
-
-Invoke it by running `/generate-workbook`, or ask Claude to "build a workbook from these files".
-
 **What it does**
 
-1. Preflights everything the run needs in a sub-agent — `uv`, a Python with `openpyxl`, and `gh` access to
-   the `WorldoverProd` repos — and stops early if any of the three is missing.
-2. Asks which customer and which app, resolves that to the app's repo, and reads the *app schema*
-   out of it — the entities the app holds and how they relate.
-3. Collects the customer's source files (with your confirmation), extracts the whole pile to Markdown via
-   `extract-document-text`, and reads what came out — profiling each spreadsheet so a candidate identifier
-   column is a count rather than an impression.
-4. Runs a grilling session to agree the *mapping* with you: which app entity each pile of data feeds,
-   what identifies each item, which app field each column fills, and what has no home in the app yet.
-5. Publishes an artifact — an ER diagram plus a preview of every sheet with real sample rows — and
-   iterates on it until you approve.
-6. Writes `WORKBOOK.xlsx` in tidy-data layout, with sheets and headers named after the app's own
-   tables and columns so its agent doesn't have to guess.
-
-#### `generate-document-upload-workbook` — the documents
-
-Attach a folder of documents onto items that **already exist** in the app. The items are there and the
-documents are a folder on your computer; this builds the workbook that links the two. The files themselves
-are uploaded at the end, out of the migration.
-
-Invoke it by running `/generate-document-upload-workbook`, or ask Claude to "assign these documents to the
-items already in the app".
-
-**What it does**
-
-This skill reads no repo. Instead you give it the app's **vocabulary**: the customer's list of document
-templates, and the entity templates documents attach to — each with the sections on its page and which
-document templates sit in each section.
-
-**What it does**
+You give it the app's **vocabulary**: the customer's list of document templates, and the entity templates
+documents attach to — each with the sections on its page and which document templates sit in each section.
+Then:
 
 1. Preflights two prerequisites in a sub-agent — `uv` and a Python with `openpyxl` — and stops early if
    either is missing.
@@ -104,8 +75,7 @@ dropped.
 ### `extract-document-text`
 
 Turn a pile of document files into Markdown an agent can read. Everything the other skills read goes
-through this one: `generate-workbook` for the customer's source files, and
-`generate-document-upload-workbook` for the documents it has to classify.
+through this one — `generate-document-upload-workbook` for the documents it has to classify.
 
 Invoke it by running `/extract-document-text`, or ask Claude to "extract these documents".
 
@@ -137,9 +107,8 @@ with the result is the caller's.
 plugins/
   generate-workbook/
     .claude-plugin/plugin.json                   # plugin manifest
-    docs/                                        # shared across the plugin's skills
+    docs/                                        # the upload journey, and how a run talks to you
     vendor/                                      # MIT copies of third-party skills, used as references
-    skills/generate-workbook/                    # SKILL.md + references/ + lib/
     skills/generate-document-upload-workbook/    # SKILL.md + references/ + lib/
   extract-document-text/
     .claude-plugin/plugin.json

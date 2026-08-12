@@ -21,16 +21,13 @@ stateDiagram-v2
     Done --> [*]
 ```
 
-## Map — the skills
+## Map — the skill
 
-Which skill applies depends on what the app already holds:
+`generate-document-upload-workbook` builds the workbook, reading the assignment off the folder tree the
+customer organised. It assumes the items are already in the app: the workbook attaches documents to them
+rather than creating them.
 
-- **The items are not in the app yet** — `generate-workbook` builds the workbook that creates them, out
-  of the customer's raw source files.
-- **The items are already in the app** — `generate-document-upload-workbook` builds the workbook that
-  attaches documents to them, reading the assignment off the folder tree the customer organised.
-
-Either way, a document is carried into the workbook as two columns and nothing else:
+A document is carried into the workbook as two columns and nothing else:
 
 - **`file_sha`** — the SHA-256 of the file's bytes, lower-case hex. This is the document's identity.
   Names collide between item folders and paths change; the hash does neither.
@@ -69,14 +66,11 @@ they are what a correction has to preserve:
 - **It expects the files later, not now.** A row carries `file_sha` and `file_name`. Nothing in the
   workbook points into storage, because at migration time the file is not there yet.
 - **It reads the app's own vocabulary.** Sheet names, column names and document template names are matched
-  against the app's schema, so a run works from that vocabulary rather than the customer's wording —
-  `generate-workbook` reads it out of the app's repo, and `generate-document-upload-workbook` is given it by
-  the user. Either way, a name the app does not have resolves to nothing.
+  against the app's schema, so a run works from that vocabulary rather than the customer's wording — and
+  the user is the one who supplies it. A name the app does not have resolves to nothing.
 
 The layout that satisfies these is
-`${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/references/DOCUMENT_WORKBOOK_FORMAT.md`
-for a document workbook, and
-`${CLAUDE_PLUGIN_ROOT}/skills/generate-workbook/references/WORKBOOK_FORMAT.md` for a data one.
+`${CLAUDE_PLUGIN_ROOT}/skills/generate-document-upload-workbook/references/DOCUMENT_WORKBOOK_FORMAT.md`.
 
 ## Where the user usually needs a hand
 
