@@ -13,6 +13,8 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+import item_index
+
 SAMPLE = 12
 
 
@@ -22,6 +24,10 @@ def walk(root):
         if not path.is_file():
             continue
         parts = path.relative_to(root).parts
+        # A workbook a previous run handed over lives in this folder; it is this skill's output, not the
+        # customer's document, and counting it would put it in the totals every later step reconciles.
+        if item_index.is_our_own("/".join(parts)):
+            continue
         files.append(
             {
                 "path": "/".join(parts),

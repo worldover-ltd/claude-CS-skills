@@ -2,13 +2,48 @@
 
 How to lay out `DOCUMENT_UPLOAD_WORKBOOK.xlsx`. The unit is the **attachment**: one row per document per
 item. A document attached to two items gets two rows, and a document attached to none gets none — it goes
-on the exception list instead.
+on `IGNORED_FILES` or `FILES_WITH_ISSUES` instead.
 
 Every row comes from `CLASSIFICATIONS.json`, and every id, template and section comes from
 `WORKFLOW.json`. Nothing here invents a name or an id: the migration can only land on what the app
 already has, and the export already carries it.
 
+## Where it goes
+
+**Beside the documents, not in the session directory**: `<the folder the user gave>/DOCUMENT_UPLOAD_WORKBOOK.xlsx`.
+The user opens it against the folder it describes, and a workbook two levels deep in `.workflow/active/`
+is one they have to be told how to find.
+
+That puts the file inside the folder a later run walks, so `map_tree.py` and `hash_documents.py` both skip
+it by name — a run never reads its own output as though it were a customer's document. Build it in the
+session directory if that is easier, but the copy that is handed over lives with the documents.
+
 ## Sheets
+
+Three named sheets come first, in this order, before any data sheet. Every file under the folder is on
+exactly one of them or on a data sheet.
+
+- **`README`** — what the run did. One row per data sheet with: sheet name, which *item_kind* it attaches
+  documents to, which column holds the item identifier and which app column that is, the document count,
+  how many of that table's items the documents reached, and the folder the rows came from. Then the
+  counts that let the totals be checked: files in the folder, files carried, attachments written, files
+  ignored, files with issues. Then the two blocks of work for a person in the app — templates to create
+  and templates no section renders — described under "What needs a person" below. No per-file rows: the
+  two sheets after it hold those.
+- **`IGNORED_FILES`** — one row per file nobody wanted, with `file_name`, `source_folder_path` and
+  `reason`. These are decisions, not failures: the exclusion gate's rules (`in a folder named 'Oud'`,
+  `a .msg file`), plus anything the user said to leave out during the run. The rule that caught it is the
+  reason, in the words `EXCLUSIONS.json` recorded.
+- **`FILES_WITH_ISSUES`** — one row per file the run could not attach, with `file_name`,
+  `source_folder_path`, `reason` and, where there is one, the `evidence` the classifier gave. Each reason
+  is somebody's next action, in the words of the step that found it — see the list below.
+
+Keeping the two apart is the point of having two sheets. A file on `IGNORED_FILES` needs nobody: it is
+there so the totals add up and so a rule that caught more than intended is visible. Every file on
+`FILES_WITH_ISSUES` needs somebody, and on a real folder the second list is the short one — mixing them
+buries it.
+
+Then the data and lookup sheets:
 
 - One data sheet per *item_kind*, named `<table>_documents` as `WORKFLOW.json` spells the table:
   `raw_materials_documents`, `products_documents`. Several *item_template*s share one table and so share
@@ -25,11 +60,6 @@ already has, and the export already carries it.
   `key` is the label lower-cased with spaces as underscores (`Safety and Regulatory` →
   `safety_and_regulatory`), and `sort_order` is the section's own order in `documentSections`, counting
   from 0.
-- A `README` sheet first, before everything else. One row per data sheet with: sheet name, which
-  *item_kind* it attaches documents to, which column holds the item identifier and which app column that
-  is, the document count, how many of that table's items the documents reached, and the folder the rows
-  came from. Below that, the exceptions, one row each with the file name, its folder and why it is not in
-  a data sheet — see the list below.
 - Data starts at cell `A1` with the header row, values from row 2 down. No title banner, no merged cells,
   no blank spacer rows.
 
@@ -79,10 +109,10 @@ comes first and still names the item — the app agent resolves the link. Say wh
 Every value is text as written: identifiers keep leading zeros, SHAs are never reformatted or
 upper-cased, and an unknown is an empty cell rather than `N/A`. No formulas, no cross-sheet references.
 
-## The exception list
+## What goes on `FILES_WITH_ISSUES`
 
-Every document that is not a data row appears on `README` with its reason, in the words of whichever step
-found it. The reasons, and where each comes from:
+Every file that is not a data row and was not ignored, one row each, with its reason in the words of
+whichever step found it. The reasons, and where each comes from:
 
 | reason | from |
 | --- | --- |
@@ -100,23 +130,34 @@ found it. The reasons, and where each comes from:
 | the template named is not one the app allows there | `CLASSIFICATIONS.json`, `review` naming the proposal |
 | no section on that *item_template* renders that template | `CLASSIFICATIONS.json`, `review` saying it sits in no section |
 | the user described it rather than it being read | recorded as user-supplied during the run |
-| **excluded by decision** | `EXCLUSIONS.json`, with the rule that caught it |
 
-Each of these is somebody's next action, so `README` carries the reason in these words rather than a
-generic "skipped".
+Each of these is somebody's next action, so the reason is carried in these words rather than a generic
+"skipped". Sort the sheet by reason, so the run of forty documents waiting on one missing template reads
+as one problem rather than forty.
 
-**Excluded is not failed, and the two do not share a list.** Everything above is a file the run could not
-place; an exclusion is a file the user decided not to migrate, back at the gate before anything was read.
-Those go in their own block, **as a count per rule** — `1,263 — a .msg file`, `4,102 — in a folder named
-'Oud'` — rather than as thousands of rows. The user made that call and does not need it read back to them
-one file at a time; what they need is to be able to check the totals and see that nothing went missing
-under a rule they did not intend.
+## What goes on `IGNORED_FILES`
 
-**Proposals get their own block on `README`, above the per-document list**: one row per proposed template
-with its name and the number of documents waiting on it, and the same for templates no section renders with the
-*item_template* they were proposed for. Create the template once and every document under it becomes
-attachable, so a list of names is the useful artefact and a list of documents is not. The counts come from
-`CLASSIFICATIONS.json`'s `proposedTemplates` and `unarrangedTemplates`.
+One row per file, with the rule that caught it as the reason: `in a folder named 'Oud'`, `a .msg file`.
+Both come straight from `EXCLUSIONS.json`'s `files`, which already records the rule per file.
+
+**Ignored is not failed.** These are the user's own decisions from the gate, and they are listed per file
+rather than summarised per rule so that a rule which caught more than they intended is visible — a count
+of `4,102 — in a folder named 'Oud'` cannot show them that it also swallowed a live folder somebody named
+`Oud` by mistake. `README` carries the per-rule totals; this sheet carries what those totals are made of.
+
+## What needs a person, on `README`
+
+Two blocks, both grouped rather than per-file, because the action is taken once and clears many documents:
+
+- **Templates to create** — one row per proposed name with the number of documents waiting on it, from
+  `CLASSIFICATIONS.json`'s `proposedTemplates`. Create the template once and every document under it
+  becomes attachable.
+- **Templates no section renders** — one row per *item_template* and template, listing the sections that
+  item template does have, from `unarrangedTemplates`. Somebody arranges the template into one of them in
+  the app.
+
+The documents themselves still appear on `FILES_WITH_ISSUES`, one row each, so nothing is only ever a
+count. These blocks are the short version that says what to actually do.
 
 Two more need a person in the app rather than in the folder: a **template the app does not allow on that
 table**, which somebody has to permit before the migration runs, and an **archived item**, which somebody
@@ -131,25 +172,31 @@ has to unarchive if its documents are wanted.
 - Every `Document Templates` row names a template the app allows on that row's `table`, and carries either
   a `section_id` that appears in `Document Sections` or an empty one where no section was picked; every
   section listed holds at least one template.
-- Every document in `DOCUMENTS.json` is in exactly one place: a data sheet row, or the `README` exception
-  list. Those two plus `EXCLUSIONS.json`'s count add up to the file count `map_tree.py` reported — the
-  excluded files are not in `DOCUMENTS.json` at all, so the tree's total is the only figure all three
-  reconcile against.
+- Every file under the folder is in exactly one place: a data sheet row, an `IGNORED_FILES` row, or a
+  `FILES_WITH_ISSUES` row. Distinct file paths across the three add up to the count `map_tree.py`
+  reported, less the workbook itself. Excluded files never enter `DOCUMENTS.json`, so the tree's total is
+  the only figure all three reconcile against — and a document attached to two items is two data rows but
+  one file, so count paths rather than rows.
 - Two rows carrying the same `file_sha` and the same `table` carry the same `document_template`. One
   reading covers every copy of one content on one table, so a difference here means the fan-out went
   wrong rather than that two classifiers disagreed.
 
 ## Human-readable finish
 
-Apply to every data sheet: freeze the header row, bold it, turn on the autofilter, and set column widths
-to fit their content. This costs a few lines and is what makes the file usable by the person who has to
-check it.
+Apply to every sheet that has a header row — the data sheets, `IGNORED_FILES` and `FILES_WITH_ISSUES`:
+freeze the header row, bold it, turn on the autofilter, and set column widths to fit their content. This
+costs a few lines and is what makes the file usable by the person who has to check it. On the two file
+lists the autofilter is the whole point: it is how somebody reads one reason at a time.
 
 ## Writing it
 
 Write the file with `openpyxl`, under whichever interpreter the preflight step resolved. Keep the script
 at `.workflow/active/${sessionId}/build_workbook.py` and generate the workbook by running it, rather than
 writing cells one at a time — a correction then costs a re-run.
+
+Write it to `<the folder the user gave>/DOCUMENT_UPLOAD_WORKBOOK.xlsx`. If that path is open in Excel the
+write fails with a permission error; say so and ask them to close it rather than writing to a second name,
+since two workbooks in one folder is the thing that gets the wrong one uploaded.
 
 The script has to run wherever the user is, so build paths with `pathlib` rather than joining strings,
 and pass `encoding="utf-8"` on every text file you open — the default differs by platform and silently

@@ -60,6 +60,12 @@ land. Always the worse answer of the two.
 _Avoid_: invention, suggestion, new type
 
 **Exception**:
-A file that produces no *attachment*, carried onto the workbook's `README` with the reason in the words
-of the step that found it.
+A file the run could not turn into an *attachment*, carried onto the workbook's `FILES_WITH_ISSUES` with
+the reason in the words of the step that found it. Every one is somebody's next action.
 _Avoid_: failure, skip, error
+
+**Exclusion**:
+A file somebody decided not to migrate, caught at the gate before anything was read, listed on the
+workbook's `IGNORED_FILES` with the rule that caught it. An exclusion needs nobody — it is recorded so
+the totals add up and so a rule that caught more than intended is visible.
+_Avoid_: exception, filtered, dropped

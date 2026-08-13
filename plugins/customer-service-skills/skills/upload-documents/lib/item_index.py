@@ -17,6 +17,9 @@ from pathlib import Path
 TRUE = {"true", "t", "yes", "y", "1"}
 ITEM_COLUMNS = ("table", "id", "identifier", "name", "template", "archived")
 
+# What a run leaves in the customer's folder, and so what a later run must not read back as a document.
+OUR_OWN_FILES = {"document_upload_workbook.xlsx"}
+
 
 class ExportError(Exception):
     """The exported files cannot carry a run — the message says what to fix and where."""
@@ -262,6 +265,16 @@ def identifier_for(relative_path, rule):
         return (found.group(1) if found.groups() else found.group(0)).strip(), None
 
     return None, f"unknown identifier rule type {kind!r}"
+
+
+def is_our_own(relative_path):
+    """Whether this file is something a run of this skill wrote into the customer's folder.
+
+    The workbook is handed over beside the documents it describes, which puts it inside the folder the
+    next run walks. Left alone it would be hashed, converted and sent to a classifier as though the
+    customer had filed it.
+    """
+    return relative_path.rsplit("/", 1)[-1].casefold() in OUR_OWN_FILES
 
 
 def excluded_paths(session_dir):

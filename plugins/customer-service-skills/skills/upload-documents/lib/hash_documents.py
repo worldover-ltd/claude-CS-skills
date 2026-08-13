@@ -46,9 +46,12 @@ def main():
 
     excluded = item_index.excluded_paths(out_dir)
 
-    documents, skipped = [], 0
+    documents, skipped, ours = [], 0, 0
     for path in sorted(p for p in root.rglob("*") if p.is_file()):
         relative = "/".join(path.relative_to(root).parts)
+        if item_index.is_our_own(relative):
+            ours += 1
+            continue
         if relative in excluded:
             skipped += 1
             continue
@@ -66,6 +69,8 @@ def main():
         raise SystemExit(f"no files under {root}" + (f" once {skipped} exclusion(s) are applied" if skipped else ""))
     if skipped:
         print(f"{skipped} file(s) left out by decision, per EXCLUSIONS.json")
+    if ours:
+        print(f"{ours} workbook(s) from an earlier run skipped — a run does not read its own output")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "DOCUMENTS.json").write_text(

@@ -1,10 +1,17 @@
 {
   "name": "customer-service-skills",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Skills for the Customer Service team. Holds upload-documents, which builds the workbook that attaches a folder of documents onto items that already exist in a Worldmaker app, reading each document to decide what kind of document it is.",
   "author": {
     "name": "Frederico Correia",
     "email": "frederico.correia@worldover.io"
   },
-  "keywords": ["excel", "workbook", "generate", "documents", "migration", "upload"]
+  "keywords": [
+    "excel",
+    "workbook",
+    "generate",
+    "documents",
+    "migration",
+    "upload"
+  ]
 }

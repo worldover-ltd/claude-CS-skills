@@ -355,8 +355,9 @@ Load the `artifact-design` skill, then publish one **markdown** artifact to
    per *item_template* — so the shape an item's page will take is visible before it is built.
 4. A preview of each sheet the workbook will have — real header row, and three to five real rows, with
    real identifier values, real file names and real template names.
-5. The exception pile, listed by file name with its evidence, and separately what was **excluded by
-   decision** — a count per rule, not a list of files, since the user made that call already.
+5. What will be on `FILES_WITH_ISSUES`, by file name with its evidence, grouped by reason — and
+   separately what will be on `IGNORED_FILES`, as a count per rule, since the user made that call already
+   and the workbook itself carries the per-file list.
 6. The attachments worth spot-checking: the lowest-confidence rows that are still going into the workbook.
 
 The sheet preview is what the user can judge, so fill it with real values rather than placeholders.
@@ -367,19 +368,28 @@ holds. Done when the user approves what the artifact shows.
 # Step 9 — write the workbook
 
 Build the Excel file per
-`${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/references/DOCUMENT_WORKBOOK_FORMAT.md`,
-writing to `.workflow/active/${sessionId}/DOCUMENT_UPLOAD_WORKBOOK.xlsx`.
+`${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/references/DOCUMENT_WORKBOOK_FORMAT.md`, writing it
+**beside the documents** at `<the folder the user gave>/DOCUMENT_UPLOAD_WORKBOOK.xlsx` — the folder it
+describes, where the user will look for it, rather than two levels down a session directory they would
+have to be guided to.
 
-Done when every file under the folder appears exactly once — as a row in a data sheet, on the `README`
-sheet's exception list, or on its excluded-by-decision list — every identifier value traces back to a row
-in `ITEMS.csv`, and the file loads back with the row counts `CLASSIFICATIONS.json` predicted.
+Three sheets come before the data: `README` with the counts and what needs doing in the app,
+`IGNORED_FILES` with everything left out by decision and the rule that caught it, and
+`FILES_WITH_ISSUES` with everything the run could not attach and why. Keeping the last two apart is what
+makes the short list short: a folder can ignore twelve thousand files and still have only forty that need
+somebody.
+
+Done when every file under the folder appears exactly once — a data sheet row, an `IGNORED_FILES` row, or
+a `FILES_WITH_ISSUES` row — every identifier value traces back to a row in `ITEMS.csv`, and the file loads
+back with the row counts `CLASSIFICATIONS.json` predicted.
 
 # Step 10 — hand it over
 
-Give the user the full path to `DOCUMENT_UPLOAD_WORKBOOK.xlsx`, one line per sheet saying which
-*item_kind* it attaches documents to and how many, the sections each *item_template* ended up with,
-whatever ended up on the exception pile, and the two or three attachments worth spot-checking — the
-lowest-confidence rows in the workbook.
+Give the user the full path to `DOCUMENT_UPLOAD_WORKBOOK.xlsx` — it is in their own documents folder, so
+say that, since the last version of this skill left it somewhere they had to be shown. Then one line per
+data sheet saying which *item_kind* it attaches documents to and how many, the sections each
+*item_template* ended up with, how many files are on `IGNORED_FILES` and on `FILES_WITH_ISSUES`, and the
+two or three attachments worth spot-checking — the lowest-confidence rows in the workbook.
 
 Then what happens next, since two things are still to come and one of them can catch them out: they start
 a migration with this workbook, and the migration then asks them for the document files themselves. Those
