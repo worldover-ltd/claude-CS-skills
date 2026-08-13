@@ -1,19 +1,21 @@
 # Document uploading, end to end
 
-Getting a customer's documents into their Worldmaker app takes three stages, in order: **map**,
-**migrate**, **upload**. The skills in this plugin do the first; the user does the other two by hand in
-Worldmaker. The document files stay on the user's computer the whole time a run is happening — they are
-uploaded last, out of the migration itself.
+Getting a customer's documents into their Worldmaker app takes four stages, in order: **export**, **map**,
+**migrate**, **upload**. The customer's own app agent does the first, this plugin's skill does the second,
+and the user does the last two by hand in Worldmaker. The document files stay on the user's computer the
+whole time a run is happening — they are uploaded last, out of the migration itself.
 
 Drawn, so it can be shown to the user rather than described:
 
 ```mermaid
 stateDiagram-v2
+    state "Workflow and items exported" as Exported
     state "Workbook built" as Mapped
     state "Migration waiting for files" as Awaiting
     state "Documents attached" as Done
 
-    [*] --> Mapped : a skill maps the documents
+    [*] --> Exported : the app agent exports what the app holds
+    Exported --> Mapped : a run matches the documents to those items
     Mapped --> Awaiting : migration started, file_sha and file_name found
     Mapped --> Done : no document columns, so nothing is expected
     Awaiting --> Done : files uploaded from the card, matched by SHA-256
@@ -21,10 +23,19 @@ stateDiagram-v2
     Done --> [*]
 ```
 
+## Export — the customer's app agent
+
+`worldover-export-data-for-document-upload`, run against the customer's app, writes two files the user
+brings back: the app's document templates and *item_template*s, and every item documents can attach to.
+Nothing on the user's machine can read the app, so without these there is nothing to attach documents to.
+
+Both file names end in the same uuid. A pair with different uuids is a workflow read against a stale item
+list, and a fresh export is the fix.
+
 ## Map — the skill
 
-`upload-documents` builds the workbook, reading the assignment off the folder tree the
-customer organised. It assumes the items are already in the app: the workbook attaches documents to them
+`upload-documents` builds the workbook, matching the folder tree the customer organised against the
+exported items. It assumes the items are already in the app: the workbook attaches documents to them
 rather than creating them.
 
 A document is carried into the workbook as two columns and nothing else:

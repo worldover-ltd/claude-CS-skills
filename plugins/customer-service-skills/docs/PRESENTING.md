@@ -27,10 +27,10 @@ means instead.
 | What you found | What you say |
 |---|---|
 | Documents attach through a link table rather than a column | (cut — nothing changes for them) |
-| `document_templates` rows live in the app, not the repo | "I can't check your folder names against the app's own list of document types — that list only exists inside the app. So you're the judge of whether a folder called SDS matches what this app already calls it." |
+| `document_templates` and the item rows come from the export | "I'm checking your folders against the app's real list of items, so if a folder is named for something that isn't in there, I'll tell you which one rather than guessing." |
 | Sections are `field_sections` scoped by `owner_type`, attached via `section_attachments` | "Each kind of item gets its own set of document groups, so raw materials and products don't have to share them." |
-| `code` is nullable on every entity that has it | "Not every item has a code. If your folders are named by code, anything missing one won't match." |
-| Written to `APP_SCHEMA.md` | (cut — they will never open it) |
+| `identifier` is blank on some exported rows | "Some items have no code at all. If your folders are named by code, those items can't be matched — nothing to match them on." |
+| Written to `WORKFLOW.json` | (cut — they will never open it) |
 | Scanned PDFs need Tesseract, `.doc` needs LibreOffice | "If any of your documents are scans or old-format Word files, I won't be able to read them — you'd tell me what those are instead." |
 | Python 3.12 with `openpyxl` present | "Everything I need to build the spreadsheet is installed." |
 | These gaps bite in Step 6 | "This only matters for documents whose folder doesn't say what they are." |
@@ -96,9 +96,9 @@ come back attached to the question rather than needing to be dug out of a paragr
 | Where | Shape |
 |---|---|
 | Preflight, tooling missing | One question, install or carry on without those file types |
-| Which customer, which app | One question once you have candidate repos; free text before that |
-| The schema you read back | Confirm or correct, before it drives the run |
-| The mapping's target entities | `multiSelect` where one pile of data feeds more than one entity |
+| The exported files are missing | One question: fetch them from the app agent, or stop here |
+| The app's vocabulary read back | Confirm or correct, before it drives the run |
+| Which *item_kind* a branch feeds | Options taken from the exported tables, never free recall |
 | The tree reading, branch by branch | One question per branch, `preview` carrying the real folder names |
 | The exception pile | One question per unresolved document, its file name and folder in the description |
 | Artifact approval | Approve, iterate, or stop |

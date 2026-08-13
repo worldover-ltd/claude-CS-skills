@@ -34,36 +34,56 @@ The user may be on macOS, Linux or Windows, and the shell differs with them. Wri
 forward slashes, quote any that could contain a space, and keep each command on a single line — a
 trailing backslash continues a line in `sh` and breaks it in PowerShell.
 
-### The vocabulary
+### The export
 
-A run needs the app's own words for two things, and **the user supplies both** — nothing here reads the
-customer's app. Hold them at `.workflow/active/${sessionId}/APP_TEMPLATES.json`:
+Nothing here reads the customer's app. Its own agent does that, through the
+`worldover-export-data-for-document-upload` skill, and hands the user **two files**. They are what a run
+is built from, and a run without them cannot start.
+
+**The workflow** — `<PROJECT>_DOCUMENT_UPLOAD_WORKFLOW_<uuid>.json`, the app's vocabulary:
 
 ```json
 {
-  "documentTemplates": ["Safety Data Sheet (SDS)", "Certificate of Analysis (CoA)", "Spec Sheet"],
-  "entityTemplates": [
+  "documentTemplates": [
+    { "id": "dt_sds", "name": "Safety Data Sheet (SDS)", "for_tables": ["raw_materials"] },
+    { "id": "dt_coa", "name": "Certificate of Analysis (CoA)", "for_tables": ["raw_materials", "products"] }
+  ],
+  "itemTemplates": [
     {
       "name": "Raw Material",
       "table": "raw_materials",
       "identifierColumn": "code",
-      "sections": [
-        { "label": "Safety", "documentTemplates": ["Safety Data Sheet (SDS)"] },
-        { "label": "Quality", "documentTemplates": ["Certificate of Analysis (CoA)", "Spec Sheet"] }
+      "documentSections": [
+        { "label": "Safety", "documentTemplates": ["dt_sds"] },
+        { "label": "Quality", "documentTemplates": ["dt_coa"] }
       ]
     }
   ]
 }
 ```
 
-- **`documentTemplates`** — every kind of document the app knows. This is a **closed list**: it is what
-  the migration can land on, so a document is given one of these names or none at all.
-- **`entityTemplates`** — the kinds of item documents attach to, each with the sections its page carries
-  and which document templates sit in each section.
-- **`table`** and **`identifierColumn`** are what the workbook is built from: the sheet is named after the
-  table, and the identifier column is spelled the way the app spells it. Ask for them explicitly — the
-  user may know them as "the raw materials table" and "the code field", and the exact spellings are what
-  the migration matches on.
+**The items** — `<PROJECT>_DOCUMENT_UPLOAD_ITEMS_<uuid>.csv`, every item documents can attach to:
+
+```
+table,id,identifier,name,template,archived
+raw_materials,1,RM-0142,Glycerin,Raw Material,false
+```
+
+Both file names end in the **same uuid**. A mismatched pair is a workflow read against a stale item list,
+which is why the check reports it.
+
+Two words the app uses, and this skill uses with it:
+
+- An ***item_kind*** is a type of item documents attach to, and it **is the `table`** — `raw_materials`,
+  `products`. One sheet of the workbook per *item_kind*.
+- An ***item_template*** is a blueprint an item is built from, and the owner of the **sections** its
+  Documents tab renders. One *item_kind* has **many** *item_template*s, all on the same `table`, and the
+  items file says which one each item is on. So the table decides the sheet and the *item_template*
+  decides the sections.
+
+`documentTemplates` is a **closed list**, and `for_tables` narrows it further: a document on a
+`raw_materials` item can only be a template whose `for_tables` holds `raw_materials`. Every template
+carries the app's own `id`, so nothing in a run invents one.
 
 ### The tree
 
@@ -73,8 +93,8 @@ reading answers *what kind of document* — two questions, two sources, neither 
 
 Every level of a tree plays one of three roles:
 
-- **entity level** — its names are kinds of item ("Raw Materials", "Products"), each matching an
-  `entityTemplates` entry.
+- **item_kind level** — its names are kinds of item ("Raw Materials", "Products"), each matching a
+  `table` in the workflow.
 - **anchor level** — its names carry the identifier of one item. The anchor is the level the whole mapping
   hangs off. It can be a folder level, or the file names themselves when documents sit flat in an item's
   folder (`RM-0142_SDS.pdf`).
@@ -82,9 +102,10 @@ Every level of a tree plays one of three roles:
   like a document type is not read as one here: it becomes a hint the classifier sees, and the document's
   contents settle it.
 
-A tree is **legible** when every document under it resolves to exactly one item through an anchor whose
-name yields an identifier value the app can look that item up by. An illegible tree stops the run — a
-guessed attachment is a document filed against the wrong substance, which is worse than no workbook.
+A tree is **legible** when every document under it reaches **exactly one live item in the items file**.
+That is a fact to be measured rather than judged, and Step 4 measures it. What cannot be placed is named
+to the user rather than guessed at — a guessed attachment is a document filed against the wrong
+substance, which is worse than no row at all.
 
 ### Process
 
@@ -100,19 +121,31 @@ then wait.
 
 Done when the sub agent has reported, and the `uv` command and the interpreter name are recorded.
 
-# Step 2 — take the app's vocabulary
+# Step 2 — take the two exported files
 
-Ask the user for the two lists in "### The vocabulary" and write `APP_TEMPLATES.json` from what they give
-you. They will usually paste or describe rather than hand over JSON, so put your reading back to them as
-two tables — one row per document template, one row per entity template with its sections and the
-templates under each — and have them correct it.
+Ask the user for the workflow JSON and the items CSV described in "### The export", then check them:
 
-Where they have the document templates but not the sections, say what that costs: the workbook can still
-attach every document, and the `Document Sections` sheet comes back empty, so somebody arranges each
-item's page in the app afterwards.
+```sh
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/read_export.py" "<workflow.json>" "<items.csv>" ".workflow/active/${sessionId}"
+```
 
-Done when `APP_TEMPLATES.json` holds at least one document template and at least one entity template
-carrying a `table` and an `identifierColumn`, and the user has confirmed the tables you read back.
+That copies them in as `WORKFLOW.json` and `ITEMS.csv` — the names every later step reads — and prints
+what the app holds: per table, the identifier column, the item count, the *item_template*s, the document
+templates allowed on it, and anything that will cost them documents later. Put that back to the user as
+a table per *item_kind* and have them confirm it is the app they mean.
+
+Three things in that report are worth naming to them rather than leaving in the output, because each one
+is documents that will not attach: items that are **archived**, items with **no identifier**, and
+identifiers **held by more than one item**. A folder named by a colliding identifier resolves to no item
+at all, so those are the user's to settle in the app before a run can place them.
+
+**Without the files, stop.** They come from the customer's app, not from this machine: the user asks
+their app agent for them by running `worldover-export-data-for-document-upload`, and comes back with
+both. Describing the app's templates in chat is not a substitute — a run matches documents against real
+items, and there is nothing here to match against.
+
+Done when `WORKFLOW.json` and `ITEMS.csv` are in the session directory, the check reported no error, and
+the user has confirmed the tables read back to them.
 
 # Step 3 — map the tree
 
@@ -124,26 +157,40 @@ been opened.
 
 # Step 4 — the legibility gate
 
-Reach a verdict on the tree per that same reference.
+Read the roles off the summary per that same reference, and write your reading into
+`.workflow/active/${sessionId}/BRANCHES.json` — one branch per part of the tree, each naming a `table`
+from `WORKFLOW.json` and the rule that gets an identifier out of a path.
 
-**Legible** — put your reading to the user before acting on it, as **the board**: one row per branch, every
-cell you have not settled still a `?`. Carry two or three real folder names as the evidence for each
-identifier, so they are checking your reading against something rather than taking it on trust.
+Then **test it against the app's real items rather than reasoning about it**:
 
-Then work down it one branch at a time, asking them to confirm or correct that row, the entity choices
-offered as options from `APP_TEMPLATES.json` rather than making them recall the app's vocabulary. Redraw
-the board as each answer lands, and write the confirmed branches into
-`.workflow/active/${sessionId}/BRANCHES.json` in the shape that reference gives — the machine-readable
-form of the board, and what the next step reads.
+```sh
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/check_branches.py" ".workflow/active/${sessionId}"
+```
 
-**Illegible** — stop, and hand back something they can act on: which folders you could not resolve and
-what was missing in each, what a legible tree looks like for their case (one folder per item, named with
-the code the app knows it by), and the two moves they own — reorganise those folders and come back, or
-tell you the item each one belongs to, which you record as user-supplied. Build nothing until the tree is
-legible.
+That opens no document and writes nothing. It applies each branch's rule to every path and prints, per
+branch, how many files reach exactly one live item, and names the ones that do not — with the app's
+nearest identifiers where a folder name looks like a misspelling of one. A branch whose anchor is one
+level off reads as a match rate near zero, which is the cheapest possible moment to find out.
 
-Done when every branch in `BRANCHES.json` carries an entity from `APP_TEMPLATES.json`, an identifier rule,
-and the user's confirmation — or the run has stopped with the unresolved folders named.
+Correct the branches and run it again until the rate stops improving. This loop costs nothing: no
+document has been hashed or read yet.
+
+**Legible** — every file reaches one item. Put your reading to the user before acting on it, as **the
+board**: one row per branch with its *item_kind*, its identifier rule, its match rate, and two or three
+real folder names as the evidence. The *item_kind* choices are offered as options from `WORKFLOW.json`
+rather than making them recall the app's vocabulary. Redraw the board as each answer lands.
+
+**Not legible** — hand back what the check found, which is already specific: the folders that reach no
+item, the ones naming an archived item, the ones whose identifier is held by two items, and the near
+misses. Then the moves they own — fix the spelling or the folder names and come back, unarchive an item
+in the app, or tell you the item a folder belongs to, which you record as user-supplied.
+
+A tree can be legible in part, and a partly legible tree is worth building from: the branches that pass
+go into the workbook, and the rest go to the user as the exception pile. Say which is which rather than
+stopping the whole run over one bad folder.
+
+Done when `check_branches.py` reports every file it can place, the user has confirmed the board, and
+whatever it cannot place has been named to them.
 
 # Step 5 — hash, extract, and batch
 
@@ -169,18 +216,23 @@ with the Markdown or rendered pages a classifier can read.
 <interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/plan_batches.py" ".workflow/active/${sessionId}"
 ```
 
-That resolves each document's identifier value from its branch rule, pairs it with what to read, and
-writes one input file per batch plus `BATCHES.json`. It reports two things worth reading before going on:
-documents whose identifier rule yielded nothing, and documents with nothing readable — both go to the
-user rather than into a batch.
+That resolves each document to a **real item** — branch rule to identifier, identifier to a row in
+`ITEMS.csv` — pairs it with what to read, and writes one input file per batch plus `BATCHES.json`. Each
+batch carries only the document templates its own tables allow and only the sections of the
+*item_template*s its own documents sit on, so a classifier is never shown a choice the app would refuse.
+
+Six kinds of document never reach a batch, and it reports each separately: no branch covers it, the rule
+yielded no identifier, no item has that identifier, several items share it, the item is archived, or
+nothing could be read from it. Step 4 should have emptied the first five; anything left here goes to the
+user.
 
 Done when `BATCHES.json` names at least one batch, every document in `DOCUMENTS.json` is either in a batch
 or on the reported exception list, and the user has seen that list.
 
 # Step 6 — classify, and reconcile
 
-Each batch goes to one sub agent, which reads its input file and says, per document, which document
-template it is, which section fits, how confident it is, and the evidence for it. Follow
+Each batch goes to one sub agent, which reads its input file and says, per document, the **id** of the
+document template it is, which section fits, how confident it is, and the evidence for it. Follow
 `${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/references/CLASSIFYING_DOCUMENTS.md` —
 it holds the prompt, the output shape, and the model to run them on.
 
@@ -191,13 +243,19 @@ Then reconcile in code rather than by eye:
 ```
 
 That writes `CLASSIFICATIONS.json` and prints the roll call: how many documents answered, which batches
-are missing, the spread of confidence, and every document that came back without a template or under the
-confidence floor. Send any missing batch again; that reference holds how many rounds to give it.
+are missing, the spread of confidence, and every document that came back without a template, with a
+template the app does not allow on that table, with a section its *item_template* does not carry, or
+under the confidence floor. Send any missing batch again; that reference holds how many rounds to give it.
 
-What is left over is the **exception pile**, and it is the user's to settle: documents with no template,
-documents below the floor, and documents nothing could read. Put them to the user with the evidence the
-classifier gave, since a file name plus one line of evidence is usually enough for them to say what a
-document is.
+A classifier that finds nothing fitting in the app's list **proposes** a name instead, and the collector
+groups those by name with a count. Put them to the user that way — as a short list of templates and
+sections to create in the app, each with how many documents are waiting on it — rather than as one
+question per document. Creating a template once clears every document that proposed it.
+
+What is left over is the **exception pile**, and it is the user's to settle: documents that got neither a
+pick nor a proposal, documents below the floor, and documents nothing could read. Put them to the user
+with the evidence the classifier gave, since a file name plus one line of evidence is usually enough for
+them to say what a document is.
 
 Done when `CLASSIFICATIONS.json` holds one entry per batched document, every batch has answered or been
 reported as unanswered, and the exception pile has been through the user.
@@ -210,9 +268,10 @@ Load the `artifact-design` skill, then publish one **markdown** artifact to
 1. The tree as a `flowchart TD`, each level labelled by the role Step 4 gave it, drawn per
    `${CLAUDE_PLUGIN_ROOT}/vendor/mermaid-diagrams/references/FLOWCHARTS.md`. A tree too wide to read is
    one diagram per branch, not one crowded diagram.
-2. One card per branch: entity, identifier column, item count, document count.
+2. One card per branch: *item_kind*, identifier column, how many of that table's items the documents
+   reached, and document count. Reaching 40 of 300 items is worth seeing before the workbook is built.
 3. The document templates the classifier actually used, with a count each, and the sections they fall into
-   per entity — so the shape an item's page will take is visible before it is built.
+   per *item_template* — so the shape an item's page will take is visible before it is built.
 4. A preview of each sheet the workbook will have — real header row, and three to five real rows, with
    real identifier values, real file names and real template names.
 5. The exception pile, listed by file name with its evidence.
@@ -230,15 +289,15 @@ Build the Excel file per
 writing to `.workflow/active/${sessionId}/DOCUMENT_UPLOAD_WORKBOOK.xlsx`.
 
 Done when every document in `DOCUMENTS.json` appears either as a row in a data sheet or on the `README`
-sheet's exception list, every identifier value traces back to an anchor name, and the file loads back with
-the row counts `CLASSIFICATIONS.json` predicted.
+sheet's exception list, every identifier value traces back to a row in `ITEMS.csv`, and the file loads
+back with the row counts `CLASSIFICATIONS.json` predicted.
 
 # Step 9 — hand it over
 
-Give the user the full path to `DOCUMENT_UPLOAD_WORKBOOK.xlsx`, one line per sheet saying which kind of
-item it attaches documents to and how many, the sections each entity ended up with, whatever ended up on
-the exception pile, and the two or three attachments worth spot-checking — the lowest-confidence rows in
-the workbook.
+Give the user the full path to `DOCUMENT_UPLOAD_WORKBOOK.xlsx`, one line per sheet saying which
+*item_kind* it attaches documents to and how many, the sections each *item_template* ended up with,
+whatever ended up on the exception pile, and the two or three attachments worth spot-checking — the
+lowest-confidence rows in the workbook.
 
 Then what happens next, since two things are still to come and one of them can catch them out: they start
 a migration with this workbook, and the migration then asks them for the document files themselves. Those

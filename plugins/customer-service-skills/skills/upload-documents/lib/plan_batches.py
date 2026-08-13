@@ -3,23 +3,25 @@
 Usage:
     python3 plan_batches.py <session_dir> [--batch-size 20] [--out-name batches]
 
-Reads from <session_dir>: APP_TEMPLATES.json (the vocabulary), BRANCHES.json (entity and identifier rule
-per branch), DOCUMENTS.json (every file with its sha), EXTRACTED.json (what can be read for each).
+Reads from <session_dir>: WORKFLOW.json and ITEMS.csv (what the app holds), BRANCHES.json (table and
+identifier rule per branch), DOCUMENTS.json (every file with its sha), EXTRACTED.json (what can be read
+for each).
 
 Writes <session_dir>/batches/batch_NNN.json, one per batch, and <session_dir>/BATCHES.json naming them.
-Reports the documents it could not batch — no branch, no identifier value, or nothing readable — rather
-than dropping them.
+Reports the documents it could not batch — no branch, no identifier, no item of that name, several
+items of that name, an archived item, or nothing readable — rather than dropping them.
 
-Resolves identifiers in code: an identifier read off a folder name by eye is a document filed against the
-wrong item.
+Resolves every document to a real item in code: an identifier read off a folder name by eye is a
+document filed against the wrong item.
 """
 
 import argparse
 import json
 import os
-import re
 import sys
 from pathlib import Path
+
+import item_index
 
 SAMPLE = 10
 
@@ -31,6 +33,21 @@ READ_FROM = {
     "image": ("path",),
 }
 
+EXCEPTIONS = ("unbranched", "unidentified", "unmatched", "ambiguous", "archived", "unreadable")
+
+# The wider taxonomy a classifier proposes from when the app's own list holds nothing that fits. Passed
+# as a path so it is read only by the batches that need it, rather than inlined into every one.
+FALLBACK_TEMPLATES = Path(__file__).resolve().parent.parent / "references" / "DOCUMENT_TYPES.txt"
+
+HEADINGS = {
+    "unbranched": "NO BRANCH — the tree mapping does not cover these",
+    "unidentified": "NO IDENTIFIER — the branch rule yielded nothing, so the item is unknown",
+    "unmatched": "NO SUCH ITEM — the folder names an identifier the app does not have",
+    "ambiguous": "SEVERAL ITEMS — the identifier is held by more than one item, so it names none",
+    "archived": "ARCHIVED — the item exists but is archived, so it takes no documents",
+    "unreadable": "NOTHING TO READ — these cannot be classified, so ask the user what they hold",
+}
+
 
 def load(session_dir, name):
     path = session_dir / name
@@ -40,40 +57,8 @@ def load(session_dir, name):
 
 
 def key_for(path):
-    """Compare paths the way the filesystem does, so the three input files join reliably."""
+    """Compare paths the way the filesystem does, so the input files join reliably."""
     return os.path.normcase(os.path.normpath(str(path).replace("\\", "/")))
-
-
-def branch_for(relative_path, branches):
-    """The branch with the longest matching prefix — a root-level branch uses an empty prefix."""
-    matches = [b for b in branches if relative_path.startswith(b.get("pathPrefix", ""))]
-    return max(matches, key=lambda b: len(b.get("pathPrefix", ""))) if matches else None
-
-
-def identifier_for(relative_path, rule):
-    """(value, why-not) — the identifier this document's branch rule yields, or why it yielded nothing."""
-    parts = relative_path.split("/")
-    folders, name = parts[:-1], parts[-1]
-    kind = rule.get("type")
-
-    if kind == "folderLevel":
-        level = rule.get("level")
-        if not isinstance(level, int) or level < 1:
-            return None, f"folderLevel needs a level of 1 or more, got {level!r}"
-        if level > len(folders):
-            return None, f"only {len(folders)} folder level(s) above this file, rule wants level {level}"
-        return folders[level - 1].strip(), None
-
-    if kind == "fileName":
-        pattern = rule.get("pattern")
-        if not pattern:
-            return None, "fileName rule carries no pattern"
-        found = re.search(pattern, name)
-        if not found:
-            return None, f"pattern {pattern!r} does not match {name!r}"
-        return (found.group(1) if found.groups() else found.group(0)).strip(), None
-
-    return None, f"unknown identifier rule type {kind!r}"
 
 
 def read_from_for(record):
@@ -93,11 +78,26 @@ def read_from_for(record):
     return paths, None
 
 
-def vocabulary_from(templates):
-    entities = templates.get("entityTemplates") or []
+def vocabulary_for(app, chunk):
+    """The closed list per table, and the sections per item template, for one batch.
+
+    Both are narrowed to what this batch's own documents can use: templates by the tables present, since
+    that is the only scoping the app has, and sections by the item templates present. A classifier is
+    never shown a template the app would refuse, nor a section belonging to an item template no document
+    here sits on.
+    """
+    tables = {d["table"] for d in chunk}
+    item_templates = {d["itemTemplate"] for d in chunk if d["itemTemplate"]}
     return {
-        "documentTemplates": templates.get("documentTemplates") or [],
-        "sections": {e["name"]: e.get("sections") or [] for e in entities if e.get("name")},
+        "documentTemplates": {table: app.templates_for(table) for table in sorted(tables)},
+        "sections": {
+            name: [
+                {"label": s["label"], "documentTemplates": s["documentTemplates"]}
+                for s in app.item_templates[name]["sections"]
+            ]
+            for name in sorted(item_templates)
+            if name in app.item_templates
+        },
     }
 
 
@@ -123,7 +123,6 @@ def main():
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     session_dir = options.session_dir
-    templates = load(session_dir, "APP_TEMPLATES.json")
     branches = load(session_dir, "BRANCHES.json").get("branches") or []
     documents = load(session_dir, "DOCUMENTS.json")
     extracted = load(session_dir, "EXTRACTED.json").get("documents") or []
@@ -131,33 +130,41 @@ def main():
     if not branches:
         raise SystemExit("BRANCHES.json holds no branches — the legibility gate has not been settled")
 
-    known_entities = {e.get("name") for e in templates.get("entityTemplates") or []}
-    unknown = sorted({b.get("entity") for b in branches} - known_entities)
+    try:
+        app = item_index.load(session_dir / "WORKFLOW.json", session_dir / "ITEMS.csv")
+    except item_index.ExportError as error:
+        raise SystemExit(f"the export cannot be used: {error}")
+
+    unknown = sorted({b.get("table") for b in branches} - set(app.tables))
     if unknown:
         raise SystemExit(
-            "these branch entities are not in APP_TEMPLATES.json: "
-            + ", ".join(repr(name) for name in unknown)
+            "these branch tables are not in WORKFLOW.json: " + ", ".join(repr(t) for t in unknown)
         )
 
     by_path = {key_for(record["path"]): record for record in extracted}
-    vocabulary = vocabulary_from(templates)
 
-    ready, unbranched, unidentified, unreadable = [], [], [], []
+    ready = []
+    failed = {kind: [] for kind in EXCEPTIONS}
     for document in documents:
         relative_path = document["relativePath"]
-        branch = branch_for(relative_path, branches)
+        branch = item_index.branch_for(relative_path, branches)
         if branch is None:
-            unbranched.append((relative_path, "no branch prefix covers it"))
+            failed["unbranched"].append((relative_path, "no branch prefix covers it"))
             continue
 
-        value, why = identifier_for(relative_path, branch.get("identifier") or {})
+        value, why = item_index.identifier_for(relative_path, branch.get("identifier") or {})
         if not value:
-            unidentified.append((relative_path, why))
+            failed["unidentified"].append((relative_path, why))
+            continue
+
+        item, _, problem = app.resolve(branch["table"], value)
+        if item is None:
+            failed[problem[0]].append((relative_path, problem[1]))
             continue
 
         paths, why = read_from_for(by_path.get(key_for(document["path"])))
         if not paths:
-            unreadable.append((relative_path, why))
+            failed["unreadable"].append((relative_path, why))
             continue
 
         hint_level = branch.get("hintLevel")
@@ -167,8 +174,11 @@ def main():
             "relativePath": relative_path,
             "sha": document["sha"],
             "name": document["name"],
-            "entity": branch["entity"],
-            "identifier": value,
+            "table": item["table"],
+            "identifier": item["identifier"],
+            "itemId": item["id"],
+            "itemName": item["name"],
+            "itemTemplate": item["template"],
             "folderHint": folders[hint_level - 1] if hint_level and hint_level <= len(folders) else None,
             "readFrom": paths,
         })
@@ -186,12 +196,15 @@ def main():
 
     entries = []
     for number, chunk in enumerate(chunks, 1):
-        # The classifier is given only what it must read, so its context goes on documents.
+        # The classifier is given only what it must read, so its context goes on documents. The
+        # vocabulary is narrowed to this batch's tables for the same reason.
         payload = {
             "batch": number,
-            "vocabulary": vocabulary,
+            "fallbackTemplates": str(FALLBACK_TEMPLATES).replace("\\", "/"),
+            "vocabulary": vocabulary_for(app, chunk),
             "documents": [
-                {k: d[k] for k in ("path", "entity", "folderHint", "readFrom")} for d in chunk
+                {k: d[k] for k in ("path", "table", "itemTemplate", "folderHint", "readFrom")}
+                for d in chunk
             ],
         }
         input_path = batch_dir / f"batch_{number:03d}.json"
@@ -203,29 +216,22 @@ def main():
             "paths": [d["path"] for d in chunk],
         })
 
+    counts = {"batched": len(ready), "batches": len(entries)}
+    counts.update({kind: len(failed[kind]) for kind in EXCEPTIONS})
     manifest = {
         "batchSize": size,
-        "counts": {
-            "batched": len(ready),
-            "batches": len(entries),
-            "unbranched": len(unbranched),
-            "unidentified": len(unidentified),
-            "unreadable": len(unreadable),
-        },
+        "counts": counts,
         "documents": ready,
         "batches": entries,
         "exceptions": {
-            "unbranched": [{"relativePath": p, "why": w} for p, w in unbranched],
-            "unidentified": [{"relativePath": p, "why": w} for p, w in unidentified],
-            "unreadable": [{"relativePath": p, "why": w} for p, w in unreadable],
+            kind: [{"relativePath": p, "why": w} for p, w in failed[kind]] for kind in EXCEPTIONS
         },
     }
     (session_dir / "BATCHES.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     print(f"{len(ready)} of {len(documents)} documents in {len(entries)} batch(es) of {size}")
-    report("NO BRANCH — the tree mapping does not cover these", unbranched)
-    report("NO IDENTIFIER — the branch rule yielded nothing, so the item is unknown", unidentified)
-    report("NOTHING TO READ — these cannot be classified, so ask the user what they hold", unreadable)
+    for kind in EXCEPTIONS:
+        report(HEADINGS[kind], failed[kind])
     print(f"\n-> {session_dir / 'BATCHES.json'}")
 
 

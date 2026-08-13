@@ -25,18 +25,20 @@ The three roles are in "### The tree" in `SKILL.md`. What tells them apart is re
 the level's own distinct-name count:
 
 - A level whose names are nearly all distinct, and whose count is in the order of the customer's item
-  count, is the **anchor**. Codes, SKUs and long names sit here.
-- A level with a handful of names that each cover a large, disjoint chunk of the tree is an **entity
-  level**. Match its names against `entityTemplates` in `APP_TEMPLATES.json`.
+  count, is the **anchor**. Codes, SKUs and long names sit here. `read_export.py` printed the item count
+  per table, so this is a comparison rather than a guess.
+- A level with a handful of names that each cover a large, disjoint chunk of the tree is an ***item_kind*
+  level**. Match its names against the tables in `WORKFLOW.json`.
 - Everything else is **noise** for mapping purposes, including a level whose few names repeat across every
   branch ("SDS" under 300 item folders). Such a level names a kind of document, and it is recorded as the
   branch's `hintLevel` so the classifier sees it — a hint the document's contents can overrule. Dates,
   versions, "Final", "OLD", "scans" and "to check" are recorded as plain noise, since the user is the one
   who knows whether an "OLD" folder should be migrated at all.
 
-Check the anchor against the app rather than against your reading of it: its names have to look like values
-of the `identifierColumn` the user gave for that entity. Anchor names that are `Doc1`, `Scan 2023`,
-`Client A` or `New folder (2)` identify nothing the app can find.
+Check the anchor against the app rather than against your reading of it. `check_branches.py` does exactly
+that, so a candidate anchor is worth writing into `BRANCHES.json` and testing rather than deliberating
+over. Anchor names that are `Doc1`, `Scan 2023`, `Client A` or `New folder (2)` identify nothing the app
+can find, and the check will say so in those words.
 
 When no folder level is the anchor, test the file names — documents sitting flat in one folder often carry
 the identifier themselves (`RM-0142_SDS_2026.pdf`). A file-name anchor is legible when the identifier can
@@ -45,25 +47,30 @@ merely somewhere inside, differently each time, is not.
 
 ## The verdict
 
-The tree is **legible** when all four hold:
+`check_branches.py` reaches it, and it is one condition: **every file reaches exactly one live item in
+`ITEMS.csv`**. The check prints the rate per branch and names every file that fails, under the reason it
+failed:
 
-- every file in `TREE.json` sits under exactly one anchor value;
-- every anchor value looks like a value of that entity's `identifierColumn`;
-- each anchor value names one item, not several — two items sharing a folder is an unresolved attachment,
-  not a two-row one;
-- every branch reaches an entity in `APP_TEMPLATES.json`.
+| reason | what the user does about it |
+| --- | --- |
+| `unidentified` — the rule yielded nothing | the anchor is the wrong level, or the file-name pattern misses; fix the rule |
+| `unmatched` — no item has that identifier | a folder named for something the app does not hold, or a spelling difference; the check offers the app's nearest identifiers |
+| `ambiguous` — several items share it | the customer's data has two items on one code; they settle it in the app |
+| `archived` — the item is archived | unarchive it, or leave those documents out |
+| no branch covers it | a part of the tree the mapping missed, often files loose at the root |
 
-Anything else is **illegible**, and the failures worth naming separately are: files loose at the root with
-no folder above them, an anchor level whose names carry no identifier, one folder holding documents for
-several items, and a branch whose kind of item the user did not give a template for.
+Case is the one difference the matching forgives, and it says when it did: `rm-0143` reaches `RM-0143`
+and the check reports how many matched that way, so a systematic case difference is visible rather than
+silent.
 
-A tree can be legible in part. Report it that way — branch by branch, with counts — rather than as one
-verdict over the whole folder, since a customer who organised half their documents well should not have to
-redo the half that was already fine.
+A tree can be legible in part, and the check reports it that way — branch by branch, with rates — rather
+than as one verdict over the whole folder, since a customer who organised half their documents well
+should not have to redo the half that was already fine.
 
 ## Writing BRANCHES.json
 
-The board the user confirmed, in the form `plan_batches.py` reads. One entry per branch, at
+Your reading of the tree, in the form `check_branches.py` tests and `plan_batches.py` reads. Write it
+before the gate rather than after: it is the thing under test. One entry per branch, at
 `.workflow/active/${sessionId}/BRANCHES.json`:
 
 ```json
@@ -71,13 +78,13 @@ The board the user confirmed, in the form `plan_batches.py` reads. One entry per
   "branches": [
     {
       "pathPrefix": "Raw Materials/",
-      "entity": "Raw Material",
+      "table": "raw_materials",
       "identifier": { "type": "folderLevel", "level": 2 },
       "hintLevel": 3
     },
     {
       "pathPrefix": "Products/Flat/",
-      "entity": "Product",
+      "table": "products",
       "identifier": { "type": "fileName", "pattern": "^(PRD-\\d{4})" }
     }
   ]
@@ -87,8 +94,9 @@ The board the user confirmed, in the form `plan_batches.py` reads. One entry per
 - **`pathPrefix`** — matched against each file's path relative to the folder the user gave. The branch with
   the longest matching prefix wins, so a general branch and a more specific one can coexist. One branch
   covering the whole tree uses `""`.
-- **`entity`** — the `entityTemplates` name in `APP_TEMPLATES.json`. A name that is not there stops the
-  script rather than producing a sheet the migration cannot place.
+- **`table`** — the *item_kind*'s table, as `WORKFLOW.json` spells it. A table that is not there stops the
+  script rather than producing a sheet the migration cannot place. The branch names the table and never an
+  *item_template*: which *item_template* an item is on is the items file's answer, not the folder's.
 - **`identifier`** — how to get the item's identifier out of a path, in one of two forms:
   - `{"type": "folderLevel", "level": N}` — the Nth folder level, counting from 1 at the top of the
     relative path. `Raw Materials/RM-0142/SDS.pdf` at level 2 yields `RM-0142`.
@@ -98,5 +106,5 @@ The board the user confirmed, in the form `plan_batches.py` reads. One entry per
 - **`hintLevel`** — optional. The folder level whose names look like kinds of document, passed to the
   classifier as `folderHint`. Leave it out where no level does.
 
-Write the rule rather than the values: `plan_batches.py` applies it to every path and reports the documents
-it yields nothing for, which catches the branch whose anchor is one level off across a whole folder.
+Write the rule rather than the values: both scripts apply it to every path and report the documents it
+yields nothing for, which catches the branch whose anchor is one level off across a whole folder.

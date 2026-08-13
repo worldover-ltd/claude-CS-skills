@@ -3,21 +3,23 @@
 Usage:
     python3 collect_classifications.py <session_dir> [--floor 0.7]
 
-Reads <session_dir>/BATCHES.json — the authority on which documents were sent — and every
-<session_dir>/classified/batch_NNN.json a sub agent wrote.
+Reads <session_dir>/BATCHES.json — the authority on which documents were sent — every
+<session_dir>/classified/batch_NNN.json a sub agent wrote, and WORKFLOW.json for what the app allows.
 
-Writes <session_dir>/CLASSIFICATIONS.json: one entry per batched document, carrying its identifier, sha,
-document template, section, confidence and evidence. Prints the roll call, the confidence spread, and every
-document a person still has to settle.
+Writes <session_dir>/CLASSIFICATIONS.json: one entry per batched document, carrying its item, sha,
+document template with the app's own id, section, confidence and evidence. Prints the roll call, the
+confidence spread, and every document a person still has to settle.
 
-An answer naming a template or section outside the vocabulary is rejected here rather than carried into the
-workbook, because the migration can only land on names the app already has.
+An answer naming a template the app does not have, or one the app does not allow on that table, is
+rejected here rather than carried into the workbook.
 """
 
 import argparse
 import json
 import sys
 from pathlib import Path
+
+import item_index
 
 SAMPLE = 10
 BUCKETS = ((0.9, "0.9-1.0  named itself"), (0.7, "0.7-0.9  clear from contents"), (0.5, "0.5-0.7  inferred"))
@@ -83,23 +85,49 @@ def main():
     manifest = load(session_dir / "BATCHES.json", "BATCHES.json")
     documents = manifest.get("documents") or []
     entries = manifest.get("batches") or []
-    vocabulary = load(session_dir / "APP_TEMPLATES.json", "APP_TEMPLATES.json")
-    known_templates = set(vocabulary.get("documentTemplates") or [])
-    sections_by_entity = {
-        e["name"]: [s.get("label") for s in e.get("sections") or []]
-        for e in vocabulary.get("entityTemplates") or []
-        if e.get("name")
+
+    try:
+        app = item_index.load(session_dir / "WORKFLOW.json", session_dir / "ITEMS.csv")
+    except item_index.ExportError as error:
+        raise SystemExit(f"the export cannot be used: {error}")
+
+    allowed_by_table = {table: {t["id"] for t in app.templates_for(table)} for table in app.tables}
+    sections_by_item_template = {
+        name: [s["label"] for s in entry["sections"]] for name, entry in app.item_templates.items()
+    }
+    # Which templates each section actually holds. A table allows a template; a section renders it, and
+    # the two are not the same list — a template can be allowed on the table and arranged on no section
+    # of the item template an item happens to be on.
+    section_holds = {
+        (name, s["label"]): set(s["documentTemplates"])
+        for name, entry in app.item_templates.items()
+        for s in entry["sections"]
+    }
+    arranged_on = {
+        name: {i for s in entry["sections"] for i in s["documentTemplates"]}
+        for name, entry in app.item_templates.items()
     }
 
     answers, silent = read_answers(session_dir, entries)
 
-    results, unanswered, no_template, low, rejected, bad_section = [], [], [], [], [], []
+    results, unanswered, no_template, low, rejected, bad_section, unarranged = [], [], [], [], [], [], []
+    proposed_templates, proposed_sections = {}, {}
+    listed_paths = set()
     for document in documents:
         answer = answers.get(document["path"])
         entry = {
-            **{k: document[k] for k in ("path", "relativePath", "name", "sha", "entity", "identifier")},
+            **{
+                k: document[k]
+                for k in (
+                    "path", "relativePath", "name", "sha",
+                    "table", "identifier", "itemId", "itemName", "itemTemplate",
+                )
+            },
             "documentTemplate": None,
+            "documentTemplateId": None,
+            "proposedTemplate": None,
             "section": None,
+            "proposedSection": None,
             "confidence": None,
             "evidence": None,
             "review": None,
@@ -107,6 +135,7 @@ def main():
 
         if answer is None:
             entry["review"] = "unread — no classifier answered for this document"
+            listed_paths.add(document["relativePath"])
             unanswered.append(document["relativePath"])
             results.append(entry)
             continue
@@ -114,28 +143,69 @@ def main():
         entry["evidence"] = (answer.get("evidence") or "").strip() or None
         entry["confidence"] = confidence_of(answer.get("confidence"))
 
-        template = answer.get("documentTemplate")
-        if template and template not in known_templates:
-            entry["review"] = f"template {template!r} is not in the app's list"
-            rejected.append(f"{document['relativePath']} — proposed {template!r}")
-        elif template:
-            entry["documentTemplate"] = template
+        template_id = item_index.normalise(answer.get("documentTemplateId"))
+        proposed_template = item_index.normalise(answer.get("proposedTemplate"))
+        known = app.document_templates.get(template_id)
+        allowed = allowed_by_table.get(document["table"], set())
+        if template_id and not known:
+            entry["review"] = f"template id {template_id!r} is not in the app's list"
+            listed_paths.add(document["relativePath"])
+            rejected.append(f"{document['relativePath']} — proposed id {template_id!r}")
+        elif template_id and template_id not in allowed:
+            entry["review"] = f"template {known['name']!r} is not allowed on {document['table']}"
+            listed_paths.add(document["relativePath"])
+            rejected.append(f"{document['relativePath']} — {known['name']!r} is not for {document['table']}")
+        elif template_id:
+            entry["documentTemplateId"] = template_id
+            entry["documentTemplate"] = known["name"]
+        elif proposed_template:
+            # A read the app has no word for yet. The reading is kept and the name goes to the user,
+            # since creating the template is the action that makes this document attachable.
+            entry["proposedTemplate"] = proposed_template
+            entry["review"] = f"proposes a template the app does not have: {proposed_template!r}"
+            listed_paths.add(document["relativePath"])
+            proposed_templates.setdefault(proposed_template, []).append(document["relativePath"])
         else:
             entry["review"] = "no template fitted what the classifier read"
+            listed_paths.add(document["relativePath"])
             no_template.append(f"{document['relativePath']} — {entry['evidence'] or 'no evidence given'}")
 
-        section = answer.get("section")
-        allowed = set(sections_by_entity.get(document["entity"]) or [])
-        if section and section in allowed:
-            entry["section"] = section
-        elif section:
-            note = f"section {section!r} is not on {document['entity']}"
+        section = item_index.normalise(answer.get("section"))
+        blueprint = document["itemTemplate"] or ""
+        where = blueprint or "no item template"
+        on_template = sections_by_item_template.get(blueprint, [])
+        chosen = entry["documentTemplateId"]
+        if section and section not in on_template:
+            note = f"section {section!r} is not on {where}"
             entry["review"] = f"{entry['review']} | {note}" if entry["review"] else note
-            bad_section.append(f"{document['relativePath']} — {section!r} is not a section on {document['entity']}")
+            listed_paths.add(document["relativePath"])
+            bad_section.append(f"{document['relativePath']} — {section!r} is not a section on {where}")
+        elif section and chosen and chosen not in section_holds.get((blueprint, section), set()):
+            # The app allows this template on the table but renders it nowhere on this blueprint, so the
+            # attachment lands with no home on the item's page until somebody arranges one.
+            if chosen not in arranged_on.get(blueprint, set()):
+                note = f"{entry['documentTemplate']!r} sits in no section on {where}"
+            else:
+                note = f"section {section!r} on {where} does not hold {entry['documentTemplate']!r}"
+            entry["section"] = section
+            entry["review"] = f"{entry['review']} | {note}" if entry["review"] else note
+            listed_paths.add(document["relativePath"])
+            unarranged.append(f"{document['relativePath']} — {note}")
+        elif section:
+            entry["section"] = section
+
+        proposed_section = item_index.normalise(answer.get("proposedSection"))
+        if not entry["section"] and proposed_section:
+            entry["proposedSection"] = proposed_section
+            note = f"proposes a section {where} does not have: {proposed_section!r}"
+            entry["review"] = f"{entry['review']} | {note}" if entry["review"] else note
+            listed_paths.add(document["relativePath"])
+            proposed_sections.setdefault((blueprint, proposed_section), []).append(document["relativePath"])
 
         if entry["documentTemplate"] and (entry["confidence"] is None or entry["confidence"] < options.floor):
             shown = "unscored" if entry["confidence"] is None else f"{entry['confidence']:.2f}"
             entry["review"] = entry["review"] or f"confidence {shown}, below the {options.floor:.2f} floor"
+            listed_paths.add(document["relativePath"])
             low.append(f"{document['relativePath']} — {shown} — {entry['evidence'] or 'no evidence given'}")
 
         results.append(entry)
@@ -151,7 +221,9 @@ def main():
                 "needsReview": len(results) - len(usable),
             },
             "silentBatches": silent,
-            "sectionsByEntity": sections_by_entity,
+            "proposedTemplates": {n: len(p) for n, p in sorted(proposed_templates.items())},
+            "proposedSections": {f"{b}:{l}": len(p) for (b, l), p in sorted(proposed_sections.items())},
+            "sectionsByItemTemplate": sections_by_item_template,
             "results": results,
         }, indent=2),
         encoding="utf-8",
@@ -173,16 +245,27 @@ def main():
 
     report("UNREAD — no classifier answered, so these are not classified", unanswered)
     report("NO TEMPLATE — nothing in the app's list fitted", no_template)
-    report("TEMPLATE NOT IN THE APP — somebody has to create it first", rejected)
-    report("SECTION NOT ON THAT ENTITY — pick one the entity template lists", bad_section)
+    report("TEMPLATE THE APP CANNOT TAKE — wrong id, or not allowed on that table", rejected)
+    report("SECTION NOT ON THAT ITEM TEMPLATE — pick one the item template lists", bad_section)
+    report("NO SECTION RENDERS IT — the app allows the template but arranges it nowhere here", unarranged)
+    report(
+        "TEMPLATES TO CREATE — proposed because nothing in the app fitted",
+        [f"{name!r} — {len(paths)} document(s), e.g. {paths[0]}" for name, paths in sorted(proposed_templates.items())],
+    )
+    report(
+        "SECTIONS TO CREATE — proposed because nothing on that item template fitted",
+        [f"{label!r} on {bp or 'no item template'} — {len(paths)} document(s)" for (bp, label), paths in sorted(proposed_sections.items())],
+    )
     report(f"BELOW THE {options.floor:.2f} FLOOR — classified on thin evidence, worth spot-checking", low)
 
-    # Every document is either usable or listed above — a gap here means a review reason nothing reports.
-    listed = len(unanswered) + len(no_template) + len(rejected) + len(bad_section) + len(low)
-    if len(usable) + listed != len(documents):
+    # Every document is either usable or listed above — a gap here means a review reason nothing
+    # reports. Counted over distinct documents, since one can fail on its template and its section both.
+    needing = {r["relativePath"] for r in results if r["review"]}
+    silent_failures = sorted(needing - listed_paths)
+    if silent_failures:
         print(
-            f"\nACCOUNTING GAP: {len(documents)} documents, {len(usable)} usable, {listed} listed — "
-            "read the `review` field in CLASSIFICATIONS.json for the rest"
+            f"\nACCOUNTING GAP: {len(silent_failures)} document(s) carry a review reason nothing above "
+            f"reports — read `review` in CLASSIFICATIONS.json: {', '.join(silent_failures[:SAMPLE])}"
         )
 
     print(f"\n-> {session_dir / 'CLASSIFICATIONS.json'}")
