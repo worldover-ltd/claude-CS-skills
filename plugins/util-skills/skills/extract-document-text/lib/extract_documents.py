@@ -10,13 +10,14 @@
 
 Usage:
     uv run extract_documents.py <folder-or-json> <out_dir> [--scans first|all|none|<pages>]
-        [--max-chars 0] [--scale 2.0] [--max-pages 40] [--enhance] [--jobs 4] [--force]
+        [--max-chars 0] [--ocr] [--scale 2.0] [--max-pages 40] [--enhance] [--jobs 4] [--force]
 
 <folder-or-json> is a folder to walk, or a JSON file holding either a list of paths or
 {"documents": [{"path": ...}]}.
 
 Writes text to <out_dir>/extracted/<slug>.md, page images to <out_dir>/extracted/<slug>/page_NNN.png,
-and one record per input file to <out_dir>/EXTRACTED.json.
+OCR text to <out_dir>/extracted/<slug>.ocr.md, and one record per input file to
+<out_dir>/EXTRACTED.json.
 
 `--max-chars` caps what a reader is pointed at, keeping the head and the tail of the text: a document
 names itself at the top, and carries its form number and revision block at the bottom. The full
@@ -61,6 +62,16 @@ LIBREOFFICE_TIMEOUT = 300
 # Where the cap falls when --max-chars is set. Three parts head to one part tail: the title, the header
 # block and the opening section are what name a document, and the tail is there for a form number.
 TAIL_SHARE = 0.25
+
+# OCR is not declared inline with the rest: it pulls onnxruntime and OpenCV, 176 MB installed, which
+# every run of this script would otherwise pay for on first use. `uv run --with` adds it to the run that
+# asks for it. The recognition models ship inside the wheel, so nothing is fetched at read time.
+OCR_PACKAGE = "rapidocr-onnxruntime"
+OCR_INSTALL = f"uv run --with {OCR_PACKAGE} extract_documents.py <target> <out_dir> --ocr"
+
+# What OCR is worth running over: a file whose text is a picture. `text` is left alone, because a text
+# layer the document itself carries beats a second guess at the same page.
+OCR_KINDS = {"image", "image-only", "sparse-text"}
 
 # A page carrying fewer letters than this is a picture of a page rather than a page. Letters rather than
 # characters, because a scan often leaks a handful of bullet glyphs — enough to pass a character count
@@ -133,6 +144,31 @@ def mislabelled_as(suffix, signature):
 def note_that(record, text):
     """Notes accumulate: a file can be both mislabelled and short of a text layer."""
     record["note"] = f"{record['note']}; {text}" if record["note"] else text
+
+
+def record_for(path, relative_path, **known):
+    """One record's worth of fields, so every way a file can end up answers the same set of questions.
+
+    A file that failed and a file that converted are read by the same caller, and a field present on one
+    and absent on the other is a caller writing `.get` where it should be reading a value.
+    """
+    return {
+        "path": str(path).replace("\\", "/"),
+        "relativePath": relative_path,
+        "kind": None,
+        "textFile": None,
+        "fullTextFile": None,
+        "ocrTextFile": None,
+        "images": [],
+        "chars": 0,
+        "letters": 0,
+        "charsRead": 0,
+        "ocrChars": 0,
+        "pages": None,
+        "pagesRendered": 0,
+        "note": None,
+        **known,
+    }
 
 
 def slug_for(path):
@@ -242,6 +278,88 @@ def render_pages(path, dest, scale, page_numbers, enhance, max_px, force):
             image = image.filter(ImageFilter.MedianFilter()).filter(ImageFilter.SHARPEN)
         image.save(out)
     return [out for _, out in wanted]
+
+
+def ocr_engine():
+    """One RapidOCR per thread. It holds ONNX sessions and its own pre- and post-processing state."""
+    if not hasattr(LOCAL, "ocr"):
+        from rapidocr_onnxruntime import RapidOCR
+
+        LOCAL.ocr = RapidOCR()
+    return LOCAL.ocr
+
+
+def ocr_page(path):
+    """The lines RapidOCR read off one image, in the order it returned them."""
+    result, _ = ocr_engine()(str(path))
+    return [text for _, text, _ in result or []]
+
+
+def ocr_sources(record):
+    """The images to read for this record: its rendered pages, or the file itself where it is one."""
+    if record["images"]:
+        return record["images"]
+    return [record["path"]] if record["kind"] == "image" else []
+
+
+def ocr_record(record, out_dir, options):
+    """Read this record's pictures, and hang the text off it without touching `kind` or `textFile`.
+
+    `kind` keeps answering for the file's own text layer, so a caller that never asked for OCR reads the
+    manifest it always read. The OCR text is its own field because it is its own claim: what a model
+    made of a picture, not what the document declared.
+    """
+    sources = ocr_sources(record)
+    if not sources:
+        return
+    lines = []
+    for number, source in enumerate(sources, 1):
+        try:
+            page = ocr_page(Path(source))
+        except Exception as error:  # every backend raises its own type
+            note_that(record, f"OCR failed on page {number} ({type(error).__name__})")
+            continue
+        if page and len(sources) > 1:
+            lines.append(f"\n## Page {number}\n")
+        lines.extend(page)
+
+    text = "\n".join(lines).strip()
+    if not text:
+        note_that(record, "OCR found no text in the page(s)")
+        return
+    capped, dropped = cap_text(text, options.max_chars)
+    path = out_dir / f"{slug_for(Path(record['path']))}.ocr.md"
+    path.write_text(capped, encoding="utf-8")
+    record["ocrTextFile"] = str(path.resolve()).replace("\\", "/")
+    record["ocrChars"] = len(capped.strip())
+    note_that(
+        record,
+        f"{record['ocrChars']} characters read by OCR"
+        + (f", {dropped} past the {options.max_chars} cap left out" if dropped else ""),
+    )
+
+
+def read_by_ocr(records, out_dir, options):
+    """Run OCR over every record whose text is a picture, after the conversions are all in.
+
+    A pass of its own rather than a branch inside `extract`, because what OCR reads is the rendered
+    pages — so it has to run behind the rendering, and the record already says where those landed.
+    """
+    targets = [r for r in records if r["kind"] in OCR_KINDS]
+    if not targets:
+        print("\nnothing for OCR to read — no file came back as a picture")
+        return
+    print(f"\n{len(targets)} file(s) to read by OCR")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, options.jobs)) as pool:
+        futures = {pool.submit(ocr_record, r, out_dir, options): r for r in targets}
+        for done, future in enumerate(concurrent.futures.as_completed(futures), 1):
+            try:
+                future.result()
+            except Exception as error:  # a record that breaks OCR must not lose the whole run
+                note_that(futures[future], f"OCR failed ({type(error).__name__}: {error})")
+            if done % 25 == 0 or done == len(targets):
+                print(f"  {done}/{len(targets)} files")
+    print(f"  {sum(1 for r in targets if r['ocrTextFile'])} of {len(targets)} gave text")
 
 
 def why_unsupported(suffix, options):
@@ -378,20 +496,7 @@ def salvage(path, record, dest, note, options):
 
 
 def extract(path, root, out_dir, options, converted=None):
-    record = {
-        "path": str(path).replace("\\", "/"),
-        "relativePath": "/".join(path.relative_to(root).parts) if root else path.name,
-        "kind": None,
-        "textFile": None,
-        "fullTextFile": None,
-        "images": [],
-        "chars": 0,
-        "letters": 0,
-        "charsRead": 0,
-        "pages": None,
-        "pagesRendered": 0,
-        "note": None,
-    }
+    record = record_for(path, "/".join(path.relative_to(root).parts) if root else path.name)
     slug = slug_for(path)
     suffix = path.suffix.lower()
     signature = sniff(path)
@@ -529,6 +634,9 @@ def main():
                              "page count (default: first)")
     parser.add_argument("--max-chars", type=int, default=0,
                         help="cap what textFile holds, keeping the head and tail (default: 0, no cap)")
+    parser.add_argument("--ocr", action="store_true",
+                        help=f"read scanned pages and photographs with OCR into ocrTextFile; needs "
+                             f"{OCR_PACKAGE}, which this script does not declare (see --help)")
     parser.add_argument("--no-libreoffice", action="store_true",
                         help="leave .doc, .rtf and OpenDocument files unconverted even where LibreOffice is installed")
     parser.add_argument("--scale", type=float, default=2.0, help="render scale, 1.0 is 72 dpi (default: 2.0)")
@@ -555,6 +663,18 @@ def main():
             raise SystemExit(
                 f"{module} is not available, so {purpose} would fail for every file. Run this script with "
                 "`uv run`, which fetches what it declares, rather than with a bare python."
+            )
+
+    # Probed before a single file is converted: OCR runs at the end of a run that can take half an hour,
+    # and a missing package found there costs the whole run rather than the second it costs here.
+    if options.ocr:
+        try:
+            __import__("rapidocr_onnxruntime")
+        except ImportError:
+            raise SystemExit(
+                f"--ocr needs {OCR_PACKAGE}, which this script does not declare: it pulls onnxruntime "
+                f"and OpenCV, 176 MB installed, and most runs want none of it. Add it to this run:\n"
+                f"  {OCR_INSTALL}"
             )
 
     root, paths, missing = inputs_from(options.target)
@@ -586,20 +706,9 @@ def main():
             try:
                 records.append(future.result())
             except Exception as error:
-                records.append({
-                    "path": str(path).replace("\\", "/"),
-                    "relativePath": path.name,
-                    "kind": "failed",
-                    "textFile": None,
-                    "fullTextFile": None,
-                    "images": [],
-                    "chars": 0,
-                    "letters": 0,
-                    "charsRead": 0,
-                    "pages": None,
-                    "pagesRendered": 0,
-                    "note": f"{type(error).__name__}: {error}",
-                })
+                records.append(record_for(
+                    path, path.name, kind="failed", note=f"{type(error).__name__}: {error}"
+                ))
             if done % 25 == 0 or done == len(paths):
                 print(f"  {done}/{len(paths)} files")
     if missing:
@@ -607,20 +716,12 @@ def main():
 
     # A listed path that is not on disk still gets a record, so the manifest answers for every input.
     for path in missing:
-        records.append({
-            "path": str(path).replace("\\", "/"),
-            "relativePath": path.name,
-            "kind": "missing",
-            "textFile": None,
-            "fullTextFile": None,
-            "images": [],
-            "chars": 0,
-            "letters": 0,
-            "charsRead": 0,
-            "pages": None,
-            "pagesRendered": 0,
-            "note": "listed in the input but not on disk",
-        })
+        records.append(record_for(
+            path, path.name, kind="missing", note="listed in the input but not on disk"
+        ))
+
+    if options.ocr:
+        read_by_ocr(records, extracted_dir, options)
 
     records.sort(key=lambda r: r["relativePath"])
     counts = {}
@@ -632,6 +733,7 @@ def main():
         "extractedDir": str(extracted_dir.resolve()).replace("\\", "/"),
         "scans": options.scans,
         "maxChars": options.max_chars,
+        "ocr": OCR_PACKAGE if options.ocr else None,
         "libreOffice": options.libreoffice,
         "counts": counts,
         "documents": records,

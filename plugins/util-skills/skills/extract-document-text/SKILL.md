@@ -1,6 +1,6 @@
 ---
 name: extract-document-text
-description: "Convert document files to Markdown with MarkItDown, and render the pages of scanned PDFs that hold no text to PNGs. Triggers on \"extract-document-text\" or \"MarkItDown\", when the text or tables inside spreadsheets, Word documents, PDFs, presentations or archives are wanted, or when a PDF turns out to be a scan."
+description: "Convert document files to Markdown with MarkItDown, render the pages of scanned PDFs that hold no text to PNGs, and read those pages with OCR. Triggers on \"extract-document-text\", \"MarkItDown\" or \"OCR\", when the text or tables inside spreadsheets, Word documents, PDFs, presentations or archives are wanted, or when a PDF turns out to be a scan."
 allowed-tools: Read, Write, Bash, Glob, Grep
 ---
 
@@ -8,7 +8,8 @@ allowed-tools: Read, Write, Bash, Glob, Grep
 
 One script, `lib/extract_documents.py`, over a list of files. Per file it writes a Markdown conversion, and
 where a PDF holds no text layer — a **scan**, a photographed or faxed page wrapped in a PDF — it renders the
-pages to PNGs instead. Every file it touched lands in one JSON manifest.
+pages to PNGs instead, and under `--ocr` reads those pages back into text. Every file it touched lands in
+one JSON manifest.
 
 The engine is [MarkItDown](https://github.com/microsoft/markitdown), and rendering is `pypdfium2`. Both run
 locally, and the script declares them inline for `uv` to fetch, so it installs nothing into any Python on
@@ -75,6 +76,7 @@ documents, so `--jobs` raises conversion throughput only.
 <out_dir>/EXTRACTED.json                       the manifest
 <out_dir>/extracted/<slug>.md                  one Markdown file per converted document
 <out_dir>/extracted/<slug>.capped.md           the head and tail of it, under --max-chars
+<out_dir>/extracted/<slug>.ocr.md              what OCR read off the pictures, under --ocr
 <out_dir>/extracted/<slug>/page_001.png        rendered pages, for scans
 <out_dir>/converted/<slug>.pdf                 legacy Office files LibreOffice turned into PDFs
 ```
@@ -88,6 +90,7 @@ same name in different folders stay separate.
   "extractedDir": "C:/…/out/extracted",
   "scans": "first",
   "maxChars": 0,
+  "ocr": null,
   "libreOffice": "C:/Program Files/LibreOffice/program/soffice.exe",
   "counts": { "text": 104, "image-only": 12, "unsupported": 2 },
   "documents": [
@@ -114,7 +117,8 @@ so a caller can join on it. `textFile` and `images` are absolute, which is what 
 PDF is really text — a scan often leaks a handful of bullet glyphs, enough to pass a character count while
 holding no words. Both are counted on the **whole** conversion even under `--max-chars`, so a cap never
 changes what a file is judged to be; `charsRead` is what a reader is actually given, and `fullTextFile`
-points at the uncapped text where the two differ. `pages` is filled for PDFs only; `note` carries anything
+points at the uncapped text where the two differ. `ocrTextFile` and `ocrChars` are filled under `--ocr`
+and empty otherwise. `pages` is filled for PDFs only; `note` carries anything
 that qualifies the record, such as a page cap that was hit, a file whose bytes contradicted its name, a
 conversion LibreOffice made possible, or one that only the renderer rescued.
 
@@ -137,6 +141,7 @@ conversion LibreOffice made possible, or one that only the renderer rescued.
 | --- | --- | --- |
 | `--scans first\|all\|none\|N` | `first` | pages rendered for a PDF with no text layer: its first page, every page, none, or the first N. Page one of a scanned dossier is often its cover sheet, so `--scans 3` costs little and reaches the first real content |
 | `--max-chars N` | `0` (no cap) | cap what `textFile` points at, keeping the head and the last quarter with a marker between them — a document names itself at the top and carries its form number at the bottom. The whole conversion stays at `fullTextFile`, and `chars`, `letters` and `kind` are all counted on it, so capping never changes what a file is judged to be |
+| `--ocr` | off | read the pictures — rendered scan pages, and image files themselves — into `ocrTextFile`. Needs a package this script does not declare; see **OCR** below |
 | `--max-pages N` | `40` | page cap under `--scans all`; the cap it hit is recorded in `note` |
 | `--no-libreoffice` | off | leave `.doc`, `.rtf` and OpenDocument files unconverted even where LibreOffice is installed |
 | `--scale F` | `2.0` | render scale, where 1.0 is 72 dpi. 2.5 sharpens a small or dense page. `--max-px` caps it, and the render goes straight to the capped size rather than shrinking afterwards |
@@ -164,6 +169,39 @@ extension, and MarkItDown picks its converter off the extension alone, so the na
 failure. A JPEG called `.pdf` comes back `image`; an `.xls` called `.xlsx` is converted as the `.xls` it is;
 a PDF whose bytes pdfminer refuses is rendered instead. Each of those says so in `note`. What survives as
 `unsupported` or `failed` is a file the user genuinely has to re-save.
+
+### OCR
+
+`--ocr` reads the pictures. It runs as a pass of its own once every conversion is in, over the files whose
+text is an image — `image-only`, `sparse-text`, and `image` — and writes what it read to `ocrTextFile`. A
+`text` file is left alone: a text layer the document itself carries beats a second guess at the same page.
+What it reads are the **rendered pages**, so `--scans` decides how much of a scan reaches OCR at all, and
+`--scans none` leaves it nothing to work with.
+
+The engine is [RapidOCR](https://github.com/RapidAI/RapidOCR) on ONNX Runtime, Apache-2.0, entirely local.
+Its models ship inside the wheel, so nothing is fetched at read time and the run works offline.
+
+**It is not declared inline.** RapidOCR pulls ONNX Runtime and OpenCV — 176 MB installed — and a run that
+wants none of that should not pay for it on first use. So `--ocr` asks for it per run:
+
+```sh
+uv run --with rapidocr-onnxruntime "${CLAUDE_PLUGIN_ROOT}/skills/extract-document-text/lib/extract_documents.py" "<folder-or-json>" "<out_dir>" --scans 3 --ocr
+```
+
+Without `--with`, `--ocr` fails immediately with that command in the message, before a single file is
+converted — a missing package found at the end of a half-hour run costs the run.
+
+**`kind` does not change.** A scan that OCR read is still `image-only`, because `kind` answers for the
+file's own text layer and that is what it had: none. OCR is a separate field because it is a separate
+claim — what a model made of a picture, not what the document declared. A caller that never asked for OCR
+reads the manifest it always read, and one that did decides for itself whether to trust the text, the
+pages, or both.
+
+Accuracy is good on a clean scan and falls off on skew, low resolution and tables, where the reading order
+of a multi-column page is the first thing to go. `--scale 2.5` and `--enhance` both help a poor page.
+Recognition is CPU-bound and runs under `--jobs`, so it is far slower per page than conversion; `--scans 3`
+keeps that bounded on a folder of scanned dossiers. Every page it could not read says so in `note` rather
+than coming back as empty text.
 
 ### One file, without the script
 
