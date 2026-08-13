@@ -5,6 +5,9 @@ Usage:
 
 Writes <out_dir>/DOCUMENTS.json: one entry per file with its path, its folder, its name and its sha.
 
+Skips whatever <out_dir>/EXCLUSIONS.json names, where the exclusion gate has run. That is what keeps a
+run from paying to hash, convert and read an archive folder somebody has already said they do not want.
+
 Reads bytes only — nothing here interprets a document's contents.
 """
 
@@ -13,6 +16,8 @@ import json
 import sys
 from collections import defaultdict
 from pathlib import Path
+
+import item_index
 
 SAMPLE = 20
 CHUNK = 1 << 20
@@ -30,13 +35,23 @@ def main():
     if len(sys.argv) != 3:
         raise SystemExit(__doc__)
 
+    # Windows consoles default to a codepage that cannot print a customer's file names, and the
+    # duplicate report prints them — the first accented name would end the run.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     root, out_dir = Path(sys.argv[1]), Path(sys.argv[2])
     if not root.is_dir():
         raise SystemExit(f"not a folder: {root}")
 
-    documents = []
+    excluded = item_index.excluded_paths(out_dir)
+
+    documents, skipped = [], 0
     for path in sorted(p for p in root.rglob("*") if p.is_file()):
         relative = "/".join(path.relative_to(root).parts)
+        if relative in excluded:
+            skipped += 1
+            continue
         documents.append(
             {
                 "path": str(path).replace("\\", "/"),
@@ -48,7 +63,9 @@ def main():
         )
 
     if not documents:
-        raise SystemExit(f"no files under {root}")
+        raise SystemExit(f"no files under {root}" + (f" once {skipped} exclusion(s) are applied" if skipped else ""))
+    if skipped:
+        print(f"{skipped} file(s) left out by decision, per EXCLUSIONS.json")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "DOCUMENTS.json").write_text(

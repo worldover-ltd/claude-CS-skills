@@ -91,6 +91,11 @@ def main():
     if len(sys.argv) != 3:
         raise SystemExit(__doc__)
 
+    # Windows consoles default to a codepage that cannot print a customer's folder names, and this
+    # script prints them — the first accented name would end the run before anything has been read.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     root, out_dir = Path(sys.argv[1]), Path(sys.argv[2])
     if not root.is_dir():
         raise SystemExit(f"not a folder: {root}")

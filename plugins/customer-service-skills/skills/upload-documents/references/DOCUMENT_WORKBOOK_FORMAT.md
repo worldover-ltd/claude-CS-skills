@@ -47,8 +47,9 @@ In this order, on every data sheet:
 | `file_sha` | the document's SHA-256, lower-case hex |
 | `item_template` | the *item_template* the item is on, which is what decides its sections |
 | `source_folder_path` | the document's folder, relative to the folder the user gave, so any row can be traced back to what it was read from |
-| `confidence` | the classifier's score, 0 to 1 |
+| `confidence` | the gap between the classifier's pick and its runner-up, 0 to 1 — not how legible the document was |
 | `evidence` | the one line of evidence it gave for that template |
+| `quote` | the line it copied out of the document, which is what was checked against the file |
 
 `file_name` and `file_sha` are the two the migration agent looks for, and finding them is what makes it
 expect documents at all — so they are spelled exactly like that, on every data sheet.
@@ -57,13 +58,19 @@ expect documents at all — so they are spelled exactly like that, on every data
 identifier at all. The migration still finds items by the identifier column; this is the column that makes
 a wrong attachment provable rather than arguable.
 
-`confidence`, `evidence` and `item_template` are review aids rather than migration inputs: the migration
-ignores columns it does not recognise, and these let the user sort by confidence and see why each row says
-what it says. Keep them behind the migration's own columns.
+`confidence`, `evidence`, `quote` and `item_template` are review aids rather than migration inputs: the
+migration ignores columns it does not recognise, and these let the user sort by confidence and see why each
+row says what it says. Keep them behind the migration's own columns.
+
+`confidence` is a **margin**, not a legibility score, and the README says so where the user will read it.
+A row at 0.55 is one where two templates fitted, not one where the document was hard to read — sorting by
+it surfaces the genuinely ambiguous documents rather than the badly-scanned ones.
 
 A data row carries no section. A section groups templates rather than documents, so it is a property of the
 template and lives on the `Document Templates` sheet — the same shape the app has, where
-`section_attachments` links a section to a document template and never to a document.
+`section_attachments` links a section to a document template and never to a document. Nobody chooses it:
+the section is whichever one on that row's *item_template* renders the template the document turned out to
+be, which is why one document under two *item_template*s can sit in two differently-named sections.
 
 Where the app attaches documents through a link table rather than a column, the identifier column still
 comes first and still names the item — the app agent resolves the link. Say which shape the app has in
@@ -86,20 +93,30 @@ found it. The reasons, and where each comes from:
 | the item it names is archived | `BATCHES.json` → `exceptions.archived` |
 | nothing could be read from it | `BATCHES.json` → `exceptions.unreadable` |
 | no classifier answered for it | `CLASSIFICATIONS.json`, `review` starting `unread` |
+| the classifier could not be shown to have read it | `CLASSIFICATIONS.json`, `review` naming the receipt or the quotation |
+| two readings settled it differently | `CLASSIFICATIONS.json`, `review` saying it was read twice |
 | nothing fitted and nothing was proposed | `CLASSIFICATIONS.json`, no `documentTemplate` and no `proposedTemplate` |
 | it proposes a template the app does not have | `CLASSIFICATIONS.json`, `proposedTemplate` |
 | the template named is not one the app allows there | `CLASSIFICATIONS.json`, `review` naming the proposal |
 | no section on that *item_template* renders that template | `CLASSIFICATIONS.json`, `review` saying it sits in no section |
 | the user described it rather than it being read | recorded as user-supplied during the run |
+| **excluded by decision** | `EXCLUSIONS.json`, with the rule that caught it |
 
 Each of these is somebody's next action, so `README` carries the reason in these words rather than a
 generic "skipped".
 
+**Excluded is not failed, and the two do not share a list.** Everything above is a file the run could not
+place; an exclusion is a file the user decided not to migrate, back at the gate before anything was read.
+Those go in their own block, **as a count per rule** — `1,263 — a .msg file`, `4,102 — in a folder named
+'Oud'` — rather than as thousands of rows. The user made that call and does not need it read back to them
+one file at a time; what they need is to be able to check the totals and see that nothing went missing
+under a rule they did not intend.
+
 **Proposals get their own block on `README`, above the per-document list**: one row per proposed template
-with its name and the number of documents waiting on it, and the same for proposed sections with the
+with its name and the number of documents waiting on it, and the same for templates no section renders with the
 *item_template* they were proposed for. Create the template once and every document under it becomes
 attachable, so a list of names is the useful artefact and a list of documents is not. The counts come from
-`CLASSIFICATIONS.json`'s `proposedTemplates` and `proposedSections`.
+`CLASSIFICATIONS.json`'s `proposedTemplates` and `unarrangedTemplates`.
 
 Two more need a person in the app rather than in the folder: a **template the app does not allow on that
 table**, which somebody has to permit before the migration runs, and an **archived item**, which somebody
@@ -115,7 +132,12 @@ has to unarchive if its documents are wanted.
   a `section_id` that appears in `Document Sections` or an empty one where no section was picked; every
   section listed holds at least one template.
 - Every document in `DOCUMENTS.json` is in exactly one place: a data sheet row, or the `README` exception
-  list. Counts across the two add up to the file count `map_tree.py` reported.
+  list. Those two plus `EXCLUSIONS.json`'s count add up to the file count `map_tree.py` reported — the
+  excluded files are not in `DOCUMENTS.json` at all, so the tree's total is the only figure all three
+  reconcile against.
+- Two rows carrying the same `file_sha` and the same `table` carry the same `document_template`. One
+  reading covers every copy of one content on one table, so a difference here means the fan-out went
+  wrong rather than that two classifiers disagreed.
 
 ## Human-readable finish
 

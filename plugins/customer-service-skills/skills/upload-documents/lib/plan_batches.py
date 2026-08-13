@@ -1,7 +1,7 @@
 """Cut the extracted documents into batches a classifier can read, one input file per batch.
 
 Usage:
-    python3 plan_batches.py <session_dir> [--batch-size 20] [--out-name batches]
+    python3 plan_batches.py <session_dir> [--batch-size 20] [--max-images 12] [--round 1]
 
 Reads from <session_dir>: WORKFLOW.json and ITEMS.csv (what the app holds), BRANCHES.json (table and
 identifier rule per branch), DOCUMENTS.json (every file with its sha), EXTRACTED.json (what can be read
@@ -10,6 +10,10 @@ for each).
 Writes <session_dir>/batches/batch_NNN.json, one per batch, and <session_dir>/BATCHES.json naming them.
 Reports the documents it could not batch — no branch, no identifier, no item of that name, several
 items of that name, an archived item, or nothing readable — rather than dropping them.
+
+The unit sent out is a *reading*: one sha per table, not one file. Copies of one document are read once
+and the answer is fanned back out, so a folder holding the same certificate under forty items costs one
+reading and cannot come back as forty different types. See docs/adr/0001.
 
 Resolves every document to a real item in code: an identifier read off a folder name by eye is a
 document filed against the wrong item.
@@ -62,43 +66,105 @@ def key_for(path):
 
 
 def read_from_for(record):
-    """(paths, why-not) — the files a classifier should open for this document."""
+    """(paths, how many of them are pictures, why-not) — the files a classifier should open for this.
+
+    Pictures are counted off the paths themselves rather than taken from `pagesRendered`, which counts
+    rendered PDF pages and so is zero for a photograph the customer filed as a document. What the batch
+    budget cares about is images arriving in a conversation, and a JPEG is one of those.
+    """
     if record is None:
-        return [], "not in EXTRACTED.json — the extraction step did not see it"
+        return [], 0, "not in EXTRACTED.json — the extraction step did not see it"
     fields = READ_FROM.get(record.get("kind"))
     if not fields:
         note = record.get("note") or record.get("kind")
-        return [], f"nothing readable ({note})"
+        return [], 0, f"nothing readable ({note})"
     paths = []
     for field in fields:
         value = record.get(field)
         paths.extend(value if isinstance(value, list) else [value] if value else [])
     if not paths:
-        return [], f"kind is {record.get('kind')!r} but it carries no file to read"
-    return paths, None
+        return [], 0, f"kind is {record.get('kind')!r} but it carries no file to read"
+    return paths, sum(1 for p in paths if not str(p).lower().endswith(".md")), None
+
+
+def reading_ids_for(keys):
+    """{(sha, table): id} — eight hex characters of the sha, made unique where that is not enough.
+
+    Short because the classifier copies it back by hand and a long opaque string is a thing models
+    truncate. Eight hex characters collide often enough across tens of thousands of documents to be
+    worth resolving rather than hoping about, and the same sha on two tables is two readings sharing a
+    prefix by construction.
+    """
+    ids, taken = {}, {}
+    for sha, table in sorted(keys):
+        stem = sha[:8]
+        seen = taken.get(stem, 0) + 1
+        taken[stem] = seen
+        ids[(sha, table)] = stem if seen == 1 else f"{stem}-{seen}"
+    return ids
+
+
+def group_into_readings(ready, ids):
+    """One reading per (sha, table), carrying every folder its copies sat in.
+
+    What to read comes from the first copy that has anything readable, so a copy whose conversion failed
+    is carried by an identical twin that converted rather than reported as unreadable.
+    """
+    readings = {}
+    for document in ready:
+        key = (document["sha"], document["table"])
+        reading = readings.get(key)
+        if reading is None:
+            reading = readings[key] = {
+                "readingId": ids[key],
+                "sha": document["sha"],
+                "table": document["table"],
+                "readFrom": [],
+                "images": 0,
+                "folderHints": [],
+                "files": [],
+            }
+        reading["files"].append(document["relativePath"])
+        if not reading["readFrom"] and document["readFrom"]:
+            reading["readFrom"] = document["readFrom"]
+            reading["images"] = document["images"]
+        hint = document["folderHint"]
+        if hint and hint not in reading["folderHints"]:
+            reading["folderHints"].append(hint)
+    return list(readings.values())
+
+
+def cut_into_batches(readings, size, max_images):
+    """Batches closed by whichever bites first: the reading count, or the images they carry.
+
+    Images are the cap that matters, because an image is what the API drops out of a prompt mid-read,
+    and an agent it happens to answers in full regardless — a short answer would at least be visible.
+    """
+    chunks, chunk, carried = [], [], 0
+    for reading in readings:
+        carries = reading["images"]
+        # `carried and` lets a single reading over the whole budget through on its own rather than
+        # closing an empty batch in front of it forever.
+        if chunk and (len(chunk) >= size or (carried and carried + carries > max_images)):
+            chunks.append(chunk)
+            chunk, carried = [], 0
+        chunk.append(reading)
+        carried += carries
+    if chunk:
+        chunks.append(chunk)
+    return chunks
 
 
 def vocabulary_for(app, chunk):
-    """The closed list per table, and the sections per item template, for one batch.
+    """The closed list of document templates per table, for one batch.
 
-    Both are narrowed to what this batch's own documents can use: templates by the tables present, since
-    that is the only scoping the app has, and sections by the item templates present. A classifier is
-    never shown a template the app would refuse, nor a section belonging to an item template no document
-    here sits on.
+    Narrowed to the tables this batch's own readings sit on, since that is the only scoping the app has:
+    a `Spec Sheet` the app permits only on products is never offered for a raw material. Sections are
+    not here at all — the section a document lands in is looked up afterwards, per copy, from the item
+    template each copy's item is on. See docs/adr/0002.
     """
-    tables = {d["table"] for d in chunk}
-    item_templates = {d["itemTemplate"] for d in chunk if d["itemTemplate"]}
-    return {
-        "documentTemplates": {table: app.templates_for(table) for table in sorted(tables)},
-        "sections": {
-            name: [
-                {"label": s["label"], "documentTemplates": s["documentTemplates"]}
-                for s in app.item_templates[name]["sections"]
-            ]
-            for name in sorted(item_templates)
-            if name in app.item_templates
-        },
-    }
+    tables = {r["table"] for r in chunk}
+    return {"documentTemplates": {table: app.templates_for(table) for table in sorted(tables)}}
 
 
 def report(heading, rows):
@@ -114,9 +180,19 @@ def report(heading, rows):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("session_dir", type=Path)
-    parser.add_argument("--batch-size", type=int, default=20, help="documents per batch (default: 20)")
-    parser.add_argument("--out-name", default="batches", help="folder for the batch input files")
+    parser.add_argument("--batch-size", type=int, default=20, help="readings per batch (default: 20)")
+    parser.add_argument("--max-images", type=int, default=12,
+                        help="images a batch may carry — rendered scan pages and photographs alike, "
+                             "whichever cap bites first (default: 12)")
+    parser.add_argument("--round", type=int, default=1,
+                        help="1 plans every reading; 2 and up plan only what REREAD.json names (default: 1)")
     options = parser.parse_args()
+    if options.round < 1:
+        raise SystemExit("--round counts from 1")
+    suffix = "" if options.round == 1 else f"_r{options.round}"
+    options.out_name = f"batches{suffix}"
+    options.answers_name = f"classified{suffix}"
+    options.manifest_name = f"BATCHES{suffix}.json"
 
     # Windows consoles default to a codepage that cannot print this summary's punctuation.
     if hasattr(sys.stdout, "reconfigure"):
@@ -162,13 +238,9 @@ def main():
             failed[problem[0]].append((relative_path, problem[1]))
             continue
 
-        paths, why = read_from_for(by_path.get(key_for(document["path"])))
-        if not paths:
-            failed["unreadable"].append((relative_path, why))
-            continue
-
         hint_level = branch.get("hintLevel")
         folders = relative_path.split("/")[:-1]
+        paths, images, why = read_from_for(by_path.get(key_for(document["path"])))
         ready.append({
             "path": document["path"],
             "relativePath": relative_path,
@@ -181,18 +253,53 @@ def main():
             "itemTemplate": item["template"],
             "folderHint": folders[hint_level - 1] if hint_level and hint_level <= len(folders) else None,
             "readFrom": paths,
+            "images": images,
+            "whyUnreadable": why,
         })
 
+    ids = reading_ids_for({(d["sha"], d["table"]) for d in ready})
+    readings = group_into_readings(ready, ids)
+
+    # A reading with nothing to read takes its whole copy group out, and only after the group has been
+    # formed: one readable copy is enough to classify content every copy shares.
+    blank = {r["readingId"] for r in readings if not r["readFrom"]}
+    readings = [r for r in readings if r["readingId"] not in blank]
+    kept = []
+    for document in ready:
+        document["readingId"] = ids[(document["sha"], document["table"])]
+        if document["readingId"] in blank:
+            failed["unreadable"].append((document["relativePath"], document["whyUnreadable"]))
+        else:
+            kept.append(document)
+        document.pop("whyUnreadable", None)
+    ready = kept
+
     if not ready:
-        raise SystemExit("no document could be batched — see the exceptions above")
+        # Printed here rather than left to the summary below, which this exit never reaches: a run that
+        # batches nothing is exactly the run whose reasons the user needs.
+        for kind in EXCEPTIONS:
+            report(HEADINGS[kind], failed[kind])
+        raise SystemExit("\nno document could be batched — every one is listed above")
+
+    # A later round re-reads only what the collector could not settle, and re-derives the readings from
+    # the same inputs rather than trusting a list of them: the ids have to mean the same thing in both
+    # rounds for the two answers to be comparable at all.
+    if options.round > 1:
+        wanted = set(load(session_dir, "REREAD.json").get("readingIds") or [])
+        if not wanted:
+            raise SystemExit("REREAD.json names no readings — there is nothing to read again")
+        readings = [r for r in readings if r["readingId"] in wanted]
+        ready = [d for d in ready if d["readingId"] in wanted]
+        if not readings:
+            raise SystemExit("none of the readings REREAD.json names survived this run's exceptions")
 
     ready.sort(key=lambda d: d["relativePath"])
-    size = max(1, options.batch_size)
-    chunks = [ready[i : i + size] for i in range(0, len(ready), size)]
+    readings.sort(key=lambda r: (r["table"], sorted(r["files"])[0]))
+    chunks = cut_into_batches(readings, max(1, options.batch_size), max(1, options.max_images))
 
     batch_dir = session_dir / options.out_name
     batch_dir.mkdir(parents=True, exist_ok=True)
-    (session_dir / "classified").mkdir(parents=True, exist_ok=True)
+    (session_dir / options.answers_name).mkdir(parents=True, exist_ok=True)
 
     entries = []
     for number, chunk in enumerate(chunks, 1):
@@ -203,8 +310,7 @@ def main():
             "fallbackTemplates": str(FALLBACK_TEMPLATES).replace("\\", "/"),
             "vocabulary": vocabulary_for(app, chunk),
             "documents": [
-                {k: d[k] for k in ("path", "table", "itemTemplate", "folderHint", "readFrom")}
-                for d in chunk
+                {k: r[k] for k in ("readingId", "table", "folderHints", "readFrom")} for r in chunk
             ],
         }
         input_path = batch_dir / f"batch_{number:03d}.json"
@@ -212,27 +318,44 @@ def main():
         entries.append({
             "batch": number,
             "input": str(input_path.resolve()).replace("\\", "/"),
-            "output": str((session_dir / "classified" / f"batch_{number:03d}.json").resolve()).replace("\\", "/"),
-            "paths": [d["path"] for d in chunk],
+            "output": str(
+                (session_dir / options.answers_name / f"batch_{number:03d}.json").resolve()
+            ).replace("\\", "/"),
+            "readingIds": [r["readingId"] for r in chunk],
+            "images": sum(r["images"] for r in chunk),
         })
 
-    counts = {"batched": len(ready), "batches": len(entries)}
+    counts = {
+        "files": len(ready),
+        "readings": len(readings),
+        "readingsSaved": len(ready) - len(readings),
+        "batches": len(entries),
+    }
     counts.update({kind: len(failed[kind]) for kind in EXCEPTIONS})
     manifest = {
-        "batchSize": size,
+        "round": options.round,
+        "batchSize": max(1, options.batch_size),
+        "maxImagesPerBatch": max(1, options.max_images),
         "counts": counts,
         "documents": ready,
+        "readings": readings,
         "batches": entries,
         "exceptions": {
             kind: [{"relativePath": p, "why": w} for p, w in failed[kind]] for kind in EXCEPTIONS
         },
     }
-    (session_dir / "BATCHES.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    (session_dir / options.manifest_name).write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-    print(f"{len(ready)} of {len(documents)} documents in {len(entries)} batch(es) of {size}")
-    for kind in EXCEPTIONS:
-        report(HEADINGS[kind], failed[kind])
-    print(f"\n-> {session_dir / 'BATCHES.json'}")
+    print(
+        f"{len(ready)} of {len(documents)} documents, read as {len(readings)} reading(s) "
+        f"in {len(entries)} batch(es)"
+    )
+    if counts["readingsSaved"]:
+        print(f"  {counts['readingsSaved']} reading(s) saved by copies sharing content")
+    if options.round == 1:
+        for kind in EXCEPTIONS:
+            report(HEADINGS[kind], failed[kind])
+    print(f"\n-> {session_dir / options.manifest_name}")
 
 
 if __name__ == "__main__":

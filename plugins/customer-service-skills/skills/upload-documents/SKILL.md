@@ -85,6 +85,20 @@ Two words the app uses, and this skill uses with it:
 `raw_materials` item can only be a template whose `for_tables` holds `raw_materials`. Every template
 carries the app's own `id`, so nothing in a run invents one.
 
+A **section** is never chosen by anybody. It is looked up from the template: whichever section of the
+item's own *item_template* renders the template the document turned out to be. So a run answers one
+question about a document — what kind it is — and derives the rest.
+
+### The unit
+
+A run reads **content**, not files. Two identical files under two items are one **reading**, and the
+answer is fanned back out to both. The key is the sha *and* the table, because the closed list is per
+table and the same PDF under a raw material and a product is picked from two different lists.
+
+This is worth holding onto because a customer's folder is mostly copies — on the first folder this ran
+against, 8,082 of 30,922 files shared content — and because it is what makes two copies of one
+certificate unable to come back as two different types.
+
 ### The tree
 
 The user gives you one folder of documents: **the tree**. Its folder names carry the one thing reading a
@@ -192,7 +206,45 @@ stopping the whole run over one bad folder.
 Done when `check_branches.py` reports every file it can place, the user has confirmed the board, and
 whatever it cannot place has been named to them.
 
-# Step 5 — hash, extract, and batch
+# Step 5 — decide what not to carry
+
+A folder holds more than a migration wants. Archive folders somebody kept a copy in, saved emails,
+quotes and price lists — on the first folder this ran against, **12,218 of 30,922 files** were left out
+by decision, and reading them would have cost exactly what reading the rest cost.
+
+Ask before paying for it:
+
+```sh
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/plan_exclusions.py" ".workflow/active/${sessionId}"
+```
+
+With no rules that prints the candidates and writes nothing: folder names ranked by how many different
+parents they repeat under, so the categories somebody made on purpose come first and an item's own
+folder sinks; and every extension with a count.
+
+Put those to the user as two short lists with counts and let them pick. Then record the decision:
+
+```sh
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/plan_exclusions.py" ".workflow/active/${sessionId}" --folders "Oud,Offertes" --extensions "msg,eml"
+```
+
+or `--none` where everything is being carried, which is an answer worth recording rather than a step to
+skip.
+
+**An exclusion is not a failure.** A file that fails is one the run could not read; a file that is
+excluded is one somebody decided not to migrate, and it reaches the workbook under those words with the
+rule that caught it. Nothing is excluded unless it is named — there is no default drop list, because a
+blanket rule on names is what silently dropped real documents last time, on a folder where 132 files
+genuinely ended `.pdf.pdf`.
+
+Then **run Step 4's check once more**. It discounts whatever is excluded, so the match rate becomes a rate
+over what is actually being carried — and a branch that read as half-legible because an archive folder
+names items in an old scheme can come back clean. Still free, still opens nothing.
+
+Done when `EXCLUSIONS.json` exists, the user chose what is in it, they have seen the count carried against
+the count in the tree, and the legibility check has been re-read against the smaller set.
+
+# Step 6 — hash, extract, and batch
 
 Three mechanical passes, in order. Each writes a file the next one reads.
 
@@ -203,12 +255,18 @@ matches on later — names collide between item folders and paths change, the ha
 <interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/hash_documents.py" "<folder>" ".workflow/active/${sessionId}"
 ```
 
-That writes `DOCUMENTS.json`, and reports the same file filed under more than one item — one document
-belonging to several items, which is a row each rather than a problem.
+That writes `DOCUMENTS.json`, skipping whatever Step 5 excluded, and reports the same file filed under
+more than one item — one document belonging to several items, which is a row each rather than a problem.
 
-**Extract.** Invoke the `extract-document-text` skill, giving it the documents folder as its input and
-`.workflow/active/${sessionId}` as its output directory. It writes `EXTRACTED.json`, one record per file
-with the Markdown or rendered pages a classifier can read.
+**Extract.** Invoke the `extract-document-text` skill, giving it `DOCUMENTS.json` as its input and
+`.workflow/active/${sessionId}` as its output directory, **with `--scans 3 --max-chars 4000`**. It writes
+`EXTRACTED.json`, one record per file with the Markdown or rendered pages a classifier can read.
+
+Both numbers are there to bound what one agent is handed. Three pages, because page one of a scanned
+dossier is often its cover sheet, the least distinguishing page in it. Four thousand characters, kept as
+the head and the tail, because a document names itself at the top and carries its form number at the
+bottom — and because twenty uncapped documents in one conversation is what overflowed the context on the
+first run of this pipeline. The full conversion stays on disk either way.
 
 **Batch.** Join the three files and cut the work into batches:
 
@@ -217,9 +275,14 @@ with the Markdown or rendered pages a classifier can read.
 ```
 
 That resolves each document to a **real item** — branch rule to identifier, identifier to a row in
-`ITEMS.csv` — pairs it with what to read, and writes one input file per batch plus `BATCHES.json`. Each
-batch carries only the document templates its own tables allow and only the sections of the
-*item_template*s its own documents sit on, so a classifier is never shown a choice the app would refuse.
+`ITEMS.csv` — collapses copies into **readings**, pairs each with what to read, and writes one input file
+per batch plus `BATCHES.json`. It reports how many readings the copies saved.
+
+A batch closes at twenty readings **or twelve images, whichever bites first**, so a batch of scans is
+small and a batch of text is not. Images are what got dropped out of prompts mid-read last time, and the
+count is of images rather than of rendered pages on purpose: a photograph the customer filed as a document
+renders no pages and is still an image in the conversation. Each batch carries only the document templates
+its own tables allow, so a classifier is never shown a choice the app would refuse.
 
 Six kinds of document never reach a batch, and it reports each separately: no branch covers it, the rule
 yielded no identifier, no item has that identifier, several items share it, the item is archived, or
@@ -229,10 +292,12 @@ user.
 Done when `BATCHES.json` names at least one batch, every document in `DOCUMENTS.json` is either in a batch
 or on the reported exception list, and the user has seen that list.
 
-# Step 6 — classify, and reconcile
+# Step 7 — classify, and reconcile
 
-Each batch goes to one sub agent, which reads its input file and says, per document, the **id** of the
-document template it is, which section fits, how confident it is, and the evidence for it. Follow
+Each batch goes to one **`document-classifier`** sub agent — the agent this plugin ships, which carries the
+model and holds the tools down to `Read` and `Write` — and it says, per reading, the **id** of the document
+template it is, the runner-up, how confident it is, a line quoted from the document, and the evidence for
+it. Follow
 `${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/references/CLASSIFYING_DOCUMENTS.md` —
 it holds the prompt, the output shape, and the model to run them on.
 
@@ -242,25 +307,41 @@ Then reconcile in code rather than by eye:
 <interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/collect_classifications.py" ".workflow/active/${sessionId}"
 ```
 
-That writes `CLASSIFICATIONS.json` and prints the roll call: how many documents answered, which batches
-are missing, the spread of confidence, and every document that came back without a template, with a
-template the app does not allow on that table, with a section its *item_template* does not carry, or
-under the confidence floor. Send any missing batch again; that reference holds how many rounds to give it.
+That fans each answer out to every copy, derives the section per copy, and checks the answer three ways
+before it counts: the template has to be one the app allows on that table, the quotation has to appear in
+what the classifier was actually given, and the classifier has to say the document reached it. Then it
+writes `CLASSIFICATIONS.json` and prints the roll call — how many answered, which batches are missing, the
+spread of confidence, and every document a person still has to settle. Send any missing batch again; that
+reference holds how many rounds to give it.
+
+**The confidence floor is not about legibility.** A score is the gap between the best-fitting template and
+the runner-up, so a document that is plainly a technical data sheet *and* plainly a specification scores
+low however clearly it announces itself. Those are the documents worth a second reading, and the collector
+names them and writes `REREAD.json` rather than spending anything:
+
+```sh
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/plan_batches.py" ".workflow/active/${sessionId}" --round 2
+```
+
+Fan those out exactly as before and run the collector again. Two readings that agree clear the floor; two
+that differ put the row in front of a person carrying both answers.
 
 A classifier that finds nothing fitting in the app's list **proposes** a name instead, and the collector
-groups those by name with a count. Put them to the user that way — as a short list of templates and
-sections to create in the app, each with how many documents are waiting on it — rather than as one
-question per document. Creating a template once clears every document that proposed it.
+groups those by name with a count, folding spellings that differ only in case or punctuation. Put them to
+the user that way — as a short list of templates and sections to create in the app, each with how many
+documents are waiting on it — rather than as one question per document. Creating a template once clears
+every document that proposed it.
 
 What is left over is the **exception pile**, and it is the user's to settle: documents that got neither a
-pick nor a proposal, documents below the floor, and documents nothing could read. Put them to the user
-with the evidence the classifier gave, since a file name plus one line of evidence is usually enough for
-them to say what a document is.
+pick nor a proposal, documents two readings disagreed on, and documents nothing could read. Put them to
+the user with the evidence the classifier gave, since a file name plus one line of evidence is usually
+enough for them to say what a document is.
 
 Done when `CLASSIFICATIONS.json` holds one entry per batched document, every batch has answered or been
-reported as unanswered, and the exception pile has been through the user.
+reported as unanswered, `REREAD.json` is empty or its round has been run, and the exception pile has been
+through the user.
 
-# Step 7 — show the workbook before building it
+# Step 8 — show the workbook before building it
 
 Load the `artifact-design` skill, then publish one **markdown** artifact to
 `.workflow/active/${sessionId}/tree.md` holding, in this order:
@@ -274,7 +355,8 @@ Load the `artifact-design` skill, then publish one **markdown** artifact to
    per *item_template* — so the shape an item's page will take is visible before it is built.
 4. A preview of each sheet the workbook will have — real header row, and three to five real rows, with
    real identifier values, real file names and real template names.
-5. The exception pile, listed by file name with its evidence.
+5. The exception pile, listed by file name with its evidence, and separately what was **excluded by
+   decision** — a count per rule, not a list of files, since the user made that call already.
 6. The attachments worth spot-checking: the lowest-confidence rows that are still going into the workbook.
 
 The sheet preview is what the user can judge, so fill it with real values rather than placeholders.
@@ -282,17 +364,17 @@ The sheet preview is what the user can judge, so fill it with real values rather
 Iterate: take their corrections, update `CLASSIFICATIONS.json`, republish to the same file path so the URL
 holds. Done when the user approves what the artifact shows.
 
-# Step 8 — write the workbook
+# Step 9 — write the workbook
 
 Build the Excel file per
 `${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/references/DOCUMENT_WORKBOOK_FORMAT.md`,
 writing to `.workflow/active/${sessionId}/DOCUMENT_UPLOAD_WORKBOOK.xlsx`.
 
-Done when every document in `DOCUMENTS.json` appears either as a row in a data sheet or on the `README`
-sheet's exception list, every identifier value traces back to a row in `ITEMS.csv`, and the file loads
-back with the row counts `CLASSIFICATIONS.json` predicted.
+Done when every file under the folder appears exactly once — as a row in a data sheet, on the `README`
+sheet's exception list, or on its excluded-by-decision list — every identifier value traces back to a row
+in `ITEMS.csv`, and the file loads back with the row counts `CLASSIFICATIONS.json` predicted.
 
-# Step 9 — hand it over
+# Step 10 — hand it over
 
 Give the user the full path to `DOCUMENT_UPLOAD_WORKBOOK.xlsx`, one line per sheet saying which
 *item_kind* it attaches documents to and how many, the sections each *item_template* ended up with,

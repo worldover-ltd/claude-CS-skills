@@ -74,7 +74,9 @@ documents, so `--jobs` raises conversion throughput only.
 ```
 <out_dir>/EXTRACTED.json                       the manifest
 <out_dir>/extracted/<slug>.md                  one Markdown file per converted document
+<out_dir>/extracted/<slug>.capped.md           the head and tail of it, under --max-chars
 <out_dir>/extracted/<slug>/page_001.png        rendered pages, for scans
+<out_dir>/converted/<slug>.pdf                 legacy Office files LibreOffice turned into PDFs
 ```
 
 `<slug>` is 8 hex characters of the SHA-256 of the file's path, then its stem — so two documents with the
@@ -85,6 +87,8 @@ same name in different folders stay separate.
   "root": "C:/…/docs",
   "extractedDir": "C:/…/out/extracted",
   "scans": "first",
+  "maxChars": 0,
+  "libreOffice": "C:/Program Files/LibreOffice/program/soffice.exe",
   "counts": { "text": 104, "image-only": 12, "unsupported": 2 },
   "documents": [
     {
@@ -108,9 +112,11 @@ so a caller can join on it. `textFile` and `images` are absolute, which is what 
 `relativePath` is relative to the input folder, or the bare file name when the input was a JSON list.
 `chars` counts the stripped Markdown and `letters` counts only its letters, which is what decides whether a
 PDF is really text — a scan often leaks a handful of bullet glyphs, enough to pass a character count while
-holding no words. `pages` is filled for PDFs only; `note` carries anything that qualifies the record, such as
-a page cap that was hit, a file whose bytes contradicted its name, or a conversion that only the renderer
-rescued.
+holding no words. Both are counted on the **whole** conversion even under `--max-chars`, so a cap never
+changes what a file is judged to be; `charsRead` is what a reader is actually given, and `fullTextFile`
+points at the uncapped text where the two differ. `pages` is filled for PDFs only; `note` carries anything
+that qualifies the record, such as a page cap that was hit, a file whose bytes contradicted its name, a
+conversion LibreOffice made possible, or one that only the renderer rescued.
 
 `kind` is the per-file outcome:
 
@@ -129,8 +135,10 @@ rescued.
 
 | flag | default | effect |
 | --- | --- | --- |
-| `--scans first\|all\|none` | `first` | pages rendered for a PDF with no text layer: its first page, every page, or none |
+| `--scans first\|all\|none\|N` | `first` | pages rendered for a PDF with no text layer: its first page, every page, none, or the first N. Page one of a scanned dossier is often its cover sheet, so `--scans 3` costs little and reaches the first real content |
+| `--max-chars N` | `0` (no cap) | cap what `textFile` points at, keeping the head and the last quarter with a marker between them — a document names itself at the top and carries its form number at the bottom. The whole conversion stays at `fullTextFile`, and `chars`, `letters` and `kind` are all counted on it, so capping never changes what a file is judged to be |
 | `--max-pages N` | `40` | page cap under `--scans all`; the cap it hit is recorded in `note` |
+| `--no-libreoffice` | off | leave `.doc`, `.rtf` and OpenDocument files unconverted even where LibreOffice is installed |
 | `--scale F` | `2.0` | render scale, where 1.0 is 72 dpi. 2.5 sharpens a small or dense page. `--max-px` caps it, and the render goes straight to the capped size rather than shrinking afterwards |
 | `--max-px N` | `2000` | longest side of a rendered page. A PDF's page can be any size, and past this a render gains detail an agent's vision downsamples away. Lowering it makes a long `--scans all` run cheaper |
 | `--enhance` | off | grayscale, raise contrast, denoise and sharpen each render — legible on a faxed or photocopied page, and it discards colour, so a stamp or a highlighted row goes with it |
@@ -143,8 +151,13 @@ PDF, Word (`.docx`), Excel (`.xlsx`, `.xls`, `.csv`, `.tsv`), PowerPoint (`.pptx
 plain text, Markdown, JSON, XML, EPub and ZIP, which is converted by expanding it and converting what is
 inside. A spreadsheet comes out as one Markdown table per sheet under a `##` heading of the sheet's name.
 
-`.doc`, `.rtf` and OpenDocument files (`.odt`, `.ods`, `.odp`) come back `unsupported`; re-saving one as
-`.docx`, `.xlsx` or PDF makes it convertible. Image files come back `image` for reading directly.
+`.doc`, `.rtf` and OpenDocument files (`.odt`, `.ods`, `.odp`) are converted to PDF by **LibreOffice, where
+it is installed**, and read as that PDF — the record still answers for the file the customer has, and says
+so in `note`. LibreOffice is probed once at the start of a run, not per file, and where it is absent these
+come back `unsupported` with a note naming it, so the difference between "install this" and "the user has
+to re-save this" is visible rather than guessed at. On the first customer folder this ran against that was
+333 files. `.pages`, `.numbers`, `.key`, `.7z` and `.rar` stay `unsupported` either way. Image files come
+back `image` for reading directly.
 
 **A file's first bytes outrank its name.** Customer folders are full of files saved under the wrong
 extension, and MarkItDown picks its converter off the extension alone, so the name being wrong is the whole

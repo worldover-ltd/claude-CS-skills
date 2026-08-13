@@ -19,7 +19,7 @@
     {
       "name": "util-skills",
       "source": "./plugins/util-skills",
-      "description": "Building blocks other skills call. Holds extract-document-text, which turns document files into Markdown an agent can read using MarkItDown under uv, and renders the pages of scanned PDFs that hold no text.",
+      "description": "Building blocks other skills call. Holds extract-document-text, which turns document files into Markdown an agent can read using MarkItDown under uv, renders the pages of scanned PDFs that hold no text, and converts legacy Office files where LibreOffice is installed.",
       "category": "productivity",
       "keywords": ["documents", "extraction", "markitdown", "uv", "pdf", "docx", "xlsx", "scans"]
     }

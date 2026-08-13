@@ -47,6 +47,16 @@ def main():
     session_dir = options.session_dir
     files = load(session_dir, "TREE.json").get("files") or []
     branches = load(session_dir, "BRANCHES.json").get("branches") or []
+
+    # A file somebody has already decided not to migrate should not count against the match rate, or the
+    # gate reads as unfixable when what is left over is only the folders being left out anyway.
+    excluded = item_index.excluded_paths(session_dir)
+    if excluded:
+        before = len(files)
+        files = [f for f in files if f["path"] not in excluded]
+        if before != len(files):
+            print(f"{before - len(files)} file(s) excluded by decision are not counted here\n")
+
     if not branches:
         raise SystemExit("BRANCHES.json holds no branches — nothing to check")
 

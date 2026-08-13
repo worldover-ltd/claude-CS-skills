@@ -32,8 +32,12 @@ the level's own distinct-name count:
 - Everything else is **noise** for mapping purposes, including a level whose few names repeat across every
   branch ("SDS" under 300 item folders). Such a level names a kind of document, and it is recorded as the
   branch's `hintLevel` so the classifier sees it — a hint the document's contents can overrule. Dates,
-  versions, "Final", "OLD", "scans" and "to check" are recorded as plain noise, since the user is the one
-  who knows whether an "OLD" folder should be migrated at all.
+  versions, "Final", "OLD", "scans" and "to check" are recorded as plain noise.
+
+  Whether an "OLD" folder should be migrated at all is the user's call, and there is a step that asks it:
+  `plan_exclusions.py` ranks exactly these repeating names by how many parents they sit under and puts
+  them to the user. Note them here as candidates rather than deciding; nothing is left out until they say
+  so, and what they leave out is counted on the workbook.
 
 Check the anchor against the app rather than against your reading of it. `check_branches.py` does exactly
 that, so a candidate anchor is worth writing into `BRANCHES.json` and testing rather than deliberating

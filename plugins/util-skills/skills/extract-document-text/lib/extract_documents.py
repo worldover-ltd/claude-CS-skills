@@ -9,14 +9,18 @@
 """Turn document files into Markdown, and render the ones with no text layer to page images.
 
 Usage:
-    uv run extract_documents.py <folder-or-json> <out_dir> [--scans first|all|none]
-        [--scale 2.0] [--max-pages 40] [--enhance] [--jobs 4] [--force]
+    uv run extract_documents.py <folder-or-json> <out_dir> [--scans first|all|none|<pages>]
+        [--max-chars 0] [--scale 2.0] [--max-pages 40] [--enhance] [--jobs 4] [--force]
 
 <folder-or-json> is a folder to walk, or a JSON file holding either a list of paths or
 {"documents": [{"path": ...}]}.
 
 Writes text to <out_dir>/extracted/<slug>.md, page images to <out_dir>/extracted/<slug>/page_NNN.png,
 and one record per input file to <out_dir>/EXTRACTED.json.
+
+`--max-chars` caps what a reader is pointed at, keeping the head and the tail of the text: a document
+names itself at the top, and carries its form number and revision block at the bottom. The full
+conversion is always kept on disk; the cap only decides what `textFile` points at.
 
 Nothing here interprets a document. A file becomes Markdown or PNGs; reading it is the caller's job.
 """
@@ -28,6 +32,7 @@ import json
 import logging
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import threading
@@ -36,6 +41,26 @@ from pathlib import Path
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tif", ".tiff"}
 UNSUPPORTED_SUFFIXES = {".doc", ".rtf", ".odt", ".ods", ".odp", ".pages", ".numbers", ".key", ".7z", ".rar"}
+
+# The ones LibreOffice converts, where it is installed. Everything else in UNSUPPORTED_SUFFIXES stays
+# the user's to re-save.
+LIBREOFFICE_SUFFIXES = {".doc", ".rtf", ".odt", ".ods", ".odp"}
+LIBREOFFICE_NAMES = ("soffice", "libreoffice")
+LIBREOFFICE_PLACES = (
+    r"C:\Program Files\LibreOffice\program\soffice.exe",
+    r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+    "/usr/bin/soffice",
+    "/usr/local/bin/soffice",
+    "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+)
+# One invocation converts a group rather than a file: LibreOffice's startup dominates its runtime, and a
+# group large enough to amortise it is still small enough that one bad file loses only its neighbours.
+LIBREOFFICE_GROUP = 12
+LIBREOFFICE_TIMEOUT = 300
+
+# Where the cap falls when --max-chars is set. Three parts head to one part tail: the title, the header
+# block and the opening section are what name a document, and the tail is there for a form number.
+TAIL_SHARE = 0.25
 
 # A page carrying fewer letters than this is a picture of a page rather than a page. Letters rather than
 # characters, because a scan often leaks a handful of bullet glyphs — enough to pass a character count
@@ -116,6 +141,64 @@ def slug_for(path):
     return f"{digest}_{stem}"
 
 
+def scan_pages_from(value):
+    """0 for none, None for every page, or how many pages from the front.
+
+    `first` stays what it always meant. A number is there because page one of a scanned dossier is often
+    its cover sheet, which is the least distinguishing page in the whole document.
+    """
+    if value == "none":
+        return 0
+    if value == "all":
+        return None
+    if value == "first":
+        return 1
+    try:
+        pages = int(value)
+    except ValueError:
+        raise SystemExit(f"--scans takes first, all, none or a page count, not {value!r}")
+    if pages < 1:
+        raise SystemExit("--scans takes a page count of 1 or more, or the word none")
+    return pages
+
+
+def pages_wanted(pages, options):
+    """The page numbers to render for a document of this length, under this run's --scans."""
+    reach = options.max_pages if options.scan_pages is None else options.scan_pages
+    return list(range(1, min(pages, reach) + 1))
+
+
+def rendering_note(pages, rendered, options):
+    """What was left unrendered, in the words of the flag that would fetch it."""
+    if rendered >= pages:
+        return None
+    if options.scan_pages is None:
+        return f"rendered {rendered} of {pages} pages — raise --max-pages for the rest"
+    return f"rendered {rendered} of {pages} pages — raise --scans for the rest"
+
+
+def elision(dropped):
+    """The marker standing in for the cut middle, so a reader knows text is missing rather than absent."""
+    return f"\n\n[... {dropped} characters omitted ...]\n\n"
+
+
+def cap_text(text, max_chars):
+    """(what a reader is pointed at, characters dropped) — the head and the tail, or the text unchanged.
+
+    Cutting the middle rather than the tail keeps the two places a document says what it is: its title
+    block, and the form number and revision table that so often sit at the very end.
+    """
+    if not max_chars or len(text) <= max_chars:
+        return text, 0
+    # Room for the marker comes out of the budget, costed at the longest it could ever print, so the
+    # result honours --max-chars rather than exceeding it by the width of its own explanation.
+    budget = max_chars - len(elision(len(text)))
+    tail = int(budget * TAIL_SHARE)
+    head = budget - tail
+    dropped = len(text) - head - tail
+    return text[:head] + elision(dropped) + (text[-tail:] if tail else ""), dropped
+
+
 def page_count(path):
     import pypdfium2 as pdfium
 
@@ -161,6 +244,87 @@ def render_pages(path, dest, scale, page_numbers, enhance, max_px, force):
     return [out for _, out in wanted]
 
 
+def why_unsupported(suffix, options):
+    """Why this file was not converted, naming the thing that would have converted it.
+
+    A file LibreOffice would have read is a different problem from one nothing reads: the first is an
+    install, the second is the user re-saving a document.
+    """
+    if suffix not in LIBREOFFICE_SUFFIXES:
+        return f"MarkItDown does not convert {suffix} — ask the user to re-save it"
+    if not options.libreoffice:
+        return (
+            f"MarkItDown does not convert {suffix}, and LibreOffice is not installed — install it and "
+            "re-run, or ask the user to re-save this as .docx, .xlsx or PDF"
+        )
+    return (
+        f"MarkItDown does not convert {suffix}, and LibreOffice could not either — ask the user to "
+        "re-save it as .docx, .xlsx or PDF"
+    )
+
+
+def libreoffice_at():
+    """The LibreOffice binary, or None. Installers on Windows leave it off PATH, so look where it lands."""
+    for name in LIBREOFFICE_NAMES:
+        found = shutil.which(name)
+        if found:
+            return found
+    return next((p for p in LIBREOFFICE_PLACES if Path(p).is_file()), None)
+
+
+def convert_group(binary, group, dest, profile):
+    """Convert one group of legacy files to PDF, returning {original path: pdf path} for those that took.
+
+    LibreOffice names its output after the input's stem, so the conversion lands in a scratch folder and
+    the results are moved out under a slug — two customer files called `spec.doc` in different folders
+    are otherwise one PDF.
+    """
+    made = {}
+    with tempfile.TemporaryDirectory() as scratch:
+        command = [
+            binary,
+            f"-env:UserInstallation=file:///{Path(profile).as_posix().lstrip('/')}",
+            "--headless", "--norestore", "--convert-to", "pdf", "--outdir", scratch,
+            *[str(p) for p in group],
+        ]
+        try:
+            subprocess.run(
+                command, check=False, timeout=LIBREOFFICE_TIMEOUT,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        except (subprocess.TimeoutExpired, OSError):
+            return made
+        for path in group:
+            produced = Path(scratch) / f"{path.stem}.pdf"
+            if not produced.is_file():
+                continue
+            landed = dest / f"{slug_for(path)}.pdf"
+            shutil.move(str(produced), str(landed))
+            made[path] = landed
+    return made
+
+
+def convert_legacy(binary, paths, dest, force):
+    """{original path: pdf path} for every legacy file LibreOffice could turn into a PDF."""
+    dest.mkdir(parents=True, exist_ok=True)
+    made, todo = {}, []
+    for path in paths:
+        landed = dest / f"{slug_for(path)}.pdf"
+        if landed.is_file() and not force:
+            made[path] = landed
+        else:
+            todo.append(path)
+
+    # One profile for the whole run, in a scratch folder: a headless LibreOffice sharing the desktop
+    # user's profile refuses to start while the GUI is open.
+    with tempfile.TemporaryDirectory() as profile:
+        for start in range(0, len(todo), LIBREOFFICE_GROUP):
+            group = todo[start:start + LIBREOFFICE_GROUP]
+            made.update(convert_group(binary, group, dest, profile))
+            print(f"  {min(start + LIBREOFFICE_GROUP, len(todo))}/{len(todo)} legacy files attempted")
+    return made
+
+
 def to_markdown(path, as_suffix=None):
     """Markdown for one file, or a ('unsupported'|'failed', reason) pair.
 
@@ -187,38 +351,43 @@ def salvage(path, record, dest, note, options):
     not begin with %PDF. Rendering is the second opinion, so `failed` means nothing worked rather than
     that one library gave up.
     """
-    if options.scans == "none":
-        record["kind"], record["note"] = "failed", note
+    if options.scan_pages == 0:
+        record["kind"] = "failed"
+        note_that(record, note)
         return record
     try:
         pages = page_count(path)
-        wanted = [1] if options.scans == "first" else list(range(1, min(pages, options.max_pages) + 1))
         written = render_pages(
-            path, dest, options.scale, wanted, options.enhance, options.max_px, options.force
+            path, dest, options.scale, pages_wanted(pages, options),
+            options.enhance, options.max_px, options.force,
         )
     except Exception:
-        record["kind"], record["note"] = "failed", note
+        record["kind"] = "failed"
+        note_that(record, note)
         return record
 
     record["kind"] = "image-only"
     record["pages"] = pages
     record["images"] = [str(p.resolve()).replace("\\", "/") for p in written]
     record["pagesRendered"] = len(written)
-    record["note"] = f"text extraction failed ({note}) — the rendered page(s) are what there is to read"
-    if options.scans == "first" and pages > 1:
-        record["note"] += f"; page 1 of {pages} rendered — re-run with --scans all for the rest"
+    note_that(record, f"text extraction failed ({note}) — the rendered page(s) are what there is to read")
+    left = rendering_note(pages, len(written), options)
+    if left:
+        note_that(record, left)
     return record
 
 
-def extract(path, root, out_dir, options):
+def extract(path, root, out_dir, options, converted=None):
     record = {
         "path": str(path).replace("\\", "/"),
         "relativePath": "/".join(path.relative_to(root).parts) if root else path.name,
         "kind": None,
         "textFile": None,
+        "fullTextFile": None,
         "images": [],
         "chars": 0,
         "letters": 0,
+        "charsRead": 0,
         "pages": None,
         "pagesRendered": 0,
         "note": None,
@@ -226,6 +395,13 @@ def extract(path, root, out_dir, options):
     slug = slug_for(path)
     suffix = path.suffix.lower()
     signature = sniff(path)
+
+    # A legacy Office file LibreOffice turned into a PDF is read as that PDF, while the record keeps
+    # answering for the file the customer actually has.
+    stand_in = (converted or {}).get(path)
+    if stand_in:
+        record["note"] = f"converted from {suffix} by LibreOffice"
+        path, suffix, signature = stand_in, ".pdf", ".pdf"
 
     if suffix in IMAGE_SUFFIXES or signature in IMAGE_SUFFIXES:
         record["kind"] = "image"
@@ -239,7 +415,7 @@ def extract(path, root, out_dir, options):
     twin = mislabelled_as(suffix, signature)
     if suffix in UNSUPPORTED_SUFFIXES and not twin:
         record["kind"] = "unsupported"
-        record["note"] = f"MarkItDown does not convert {suffix} — ask the user to re-save it"
+        record["note"] = why_unsupported(suffix, options)
         return record
 
     text_file = out_dir / f"{slug}.md"
@@ -273,9 +449,21 @@ def extract(path, root, out_dir, options):
             return record
         text_file.write_text(text, encoding="utf-8")
 
+    # Counted on the whole conversion, before any cap: what kind of document this is has to be decided
+    # on what the file holds, not on how much of it a reader was given.
     record["chars"] = len(text.strip())
     record["letters"] = len(LETTER.findall(text))
-    record["textFile"] = str(text_file.resolve()).replace("\\", "/")
+    record["fullTextFile"] = str(text_file.resolve()).replace("\\", "/")
+
+    capped, dropped = cap_text(text, options.max_chars)
+    if dropped:
+        capped_file = out_dir / f"{slug}.capped.md"
+        capped_file.write_text(capped, encoding="utf-8")
+        record["textFile"] = str(capped_file.resolve()).replace("\\", "/")
+        note_that(record, f"{dropped} characters past the {options.max_chars} cap are in fullTextFile only")
+    else:
+        record["textFile"] = record["fullTextFile"]
+    record["charsRead"] = len(capped.strip())
 
     if suffix != ".pdf" and signature != ".pdf":
         record["kind"] = "text" if record["chars"] else "empty"
@@ -298,15 +486,15 @@ def extract(path, root, out_dir, options):
     if record["kind"] == "sparse-text" and record["letters"] == 0:
         note_that(record, f"the text layer holds {record['chars']} characters and no words — glyphs, not text")
 
-    if record["kind"] == "text" or options.scans == "none":
+    if record["kind"] == "text" or options.scan_pages == 0:
         if record["kind"] != "text":
             note_that(record, "no text layer — nothing rendered, --scans was none")
         return record
 
-    wanted = [1] if options.scans == "first" else list(range(1, min(pages, options.max_pages) + 1))
     try:
         written = render_pages(
-            path, out_dir / slug, options.scale, wanted, options.enhance, options.max_px, options.force
+            path, out_dir / slug, options.scale, pages_wanted(pages, options),
+            options.enhance, options.max_px, options.force,
         )
     except Exception as error:
         note_that(record, f"could not render pages: {type(error).__name__}: {error}")
@@ -314,10 +502,9 @@ def extract(path, root, out_dir, options):
 
     record["images"] = [str(p.resolve()).replace("\\", "/") for p in written]
     record["pagesRendered"] = len(written)
-    if options.scans == "all" and pages > options.max_pages:
-        note_that(record, f"rendered {options.max_pages} of {pages} pages — raise --max-pages for the rest")
-    elif options.scans == "first" and pages > 1:
-        note_that(record, f"page 1 of {pages} rendered — re-run with --scans all to see the rest")
+    left = rendering_note(pages, len(written), options)
+    if left:
+        note_that(record, left)
     return record
 
 
@@ -337,8 +524,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("target", type=Path, help="folder to walk, or a .json list of paths")
     parser.add_argument("out_dir", type=Path, help="session directory, e.g. .workflow/active/<sessionId>")
-    parser.add_argument("--scans", choices=["first", "all", "none"], default="first",
-                        help="pages to render for a PDF with no text layer (default: first)")
+    parser.add_argument("--scans", default="first",
+                        help="pages to render for a PDF with no text layer: first, all, none, or a "
+                             "page count (default: first)")
+    parser.add_argument("--max-chars", type=int, default=0,
+                        help="cap what textFile holds, keeping the head and tail (default: 0, no cap)")
+    parser.add_argument("--no-libreoffice", action="store_true",
+                        help="leave .doc, .rtf and OpenDocument files unconverted even where LibreOffice is installed")
     parser.add_argument("--scale", type=float, default=2.0, help="render scale, 1.0 is 72 dpi (default: 2.0)")
     parser.add_argument("--max-pages", type=int, default=40, help="page cap for --scans all (default: 40)")
     parser.add_argument("--max-px", type=int, default=2000, help="longest side of a rendered page (default: 2000)")
@@ -346,6 +538,9 @@ def main():
     parser.add_argument("--jobs", type=int, default=4, help="files converted at once (default: 4)")
     parser.add_argument("--force", action="store_true", help="re-convert files already extracted")
     options = parser.parse_args()
+    options.scan_pages = scan_pages_from(options.scans)
+    if options.max_chars and options.max_chars < 200:
+        raise SystemExit("--max-chars below 200 leaves too little to identify a document by")
 
     # Windows consoles default to a codepage that cannot print this summary's punctuation.
     if hasattr(sys.stdout, "reconfigure"):
@@ -369,9 +564,23 @@ def main():
     extracted_dir = options.out_dir / "extracted"
     extracted_dir.mkdir(parents=True, exist_ok=True)
 
+    # Probed once for the whole run rather than discovered per file, so a missing binary is one answer
+    # rather than a rediscovery in every agent that meets a legacy file.
+    options.libreoffice = None if options.no_libreoffice else libreoffice_at()
+    legacy = [p for p in paths if p.suffix.lower() in LIBREOFFICE_SUFFIXES]
+    converted = {}
+    if legacy and options.libreoffice:
+        print(f"{len(legacy)} legacy Office file(s) — converting with {options.libreoffice}")
+        converted = convert_legacy(options.libreoffice, legacy, options.out_dir / "converted", options.force)
+        if len(converted) < len(legacy):
+            print(f"  {len(legacy) - len(converted)} would not convert — they stay unsupported")
+    elif legacy:
+        where = "--no-libreoffice was passed" if options.no_libreoffice else "LibreOffice is not installed"
+        print(f"{len(legacy)} legacy Office file(s) will not be converted: {where}")
+
     records = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, options.jobs)) as pool:
-        futures = {pool.submit(extract, p, root, extracted_dir, options): p for p in paths}
+        futures = {pool.submit(extract, p, root, extracted_dir, options, converted): p for p in paths}
         for done, future in enumerate(concurrent.futures.as_completed(futures), 1):
             path = futures[future]
             try:
@@ -382,9 +591,11 @@ def main():
                     "relativePath": path.name,
                     "kind": "failed",
                     "textFile": None,
+                    "fullTextFile": None,
                     "images": [],
                     "chars": 0,
                     "letters": 0,
+                    "charsRead": 0,
                     "pages": None,
                     "pagesRendered": 0,
                     "note": f"{type(error).__name__}: {error}",
@@ -401,9 +612,11 @@ def main():
             "relativePath": path.name,
             "kind": "missing",
             "textFile": None,
+            "fullTextFile": None,
             "images": [],
             "chars": 0,
             "letters": 0,
+            "charsRead": 0,
             "pages": None,
             "pagesRendered": 0,
             "note": "listed in the input but not on disk",
@@ -418,6 +631,8 @@ def main():
         "root": str(root.resolve()).replace("\\", "/") if root else None,
         "extractedDir": str(extracted_dir.resolve()).replace("\\", "/"),
         "scans": options.scans,
+        "maxChars": options.max_chars,
+        "libreOffice": options.libreoffice,
         "counts": counts,
         "documents": records,
     }

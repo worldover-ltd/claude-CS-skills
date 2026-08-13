@@ -262,3 +262,16 @@ def identifier_for(relative_path, rule):
         return (found.group(1) if found.groups() else found.group(0)).strip(), None
 
     return None, f"unknown identifier rule type {kind!r}"
+
+
+def excluded_paths(session_dir):
+    """The relative paths the user decided not to migrate, or an empty set before the gate has run.
+
+    One reader for EXCLUSIONS.json, because the two scripts that honour it — the legibility check and
+    the hasher — otherwise each carry their own copy of its shape.
+    """
+    path = Path(session_dir) / "EXCLUSIONS.json"
+    if not path.is_file():
+        return set()
+    listed = json.loads(path.read_text(encoding="utf-8")).get("files") or []
+    return {row["relativePath"] for row in listed if row.get("relativePath")}
