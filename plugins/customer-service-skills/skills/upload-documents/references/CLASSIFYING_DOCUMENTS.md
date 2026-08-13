@@ -81,8 +81,10 @@ folders is itself worth noticing.
 compliance, some 4,000 tokens if read whole. Passing the path keeps that out of every batch's context and
 puts it in reach of the batches that actually meet a document the app has no word for.
 
-`readFrom` is the extracted Markdown, the rendered pages of a scan, or the image itself — whatever
-`EXTRACTED.json` pointed at. The Markdown may be capped, with the middle elided and a marker saying so.
+`readFrom` is the extracted Markdown, what OCR read off a scan, the rendered pages of one, or the image
+itself — whatever `EXTRACTED.json` pointed at. The Markdown may be capped, with the middle elided and a
+marker saying so. OCR text is Markdown like any other and is quoted from the same way; it is a machine's
+reading of a picture, so it carries the joins and dropped characters that go with that.
 
 ## The prompt
 
@@ -119,7 +121,10 @@ For each document in that list:
    high score is what stops that happening.
 6. **Quote one line from the document**, verbatim, as `quote`. Copy it exactly as it appears — this is
    checked against the file you were given, and an answer whose quotation is not in the document is
-   treated as unread. A title, a header, a form number, a section heading.
+   treated as unread. A title, a header, a form number, a section heading. Where the file is a machine's
+   reading of a picture, it will hold run-together words and mangled characters: copy those as they are.
+   `SAFETYDATASHEET` quoted as `SAFETY DATA SHEET` is a line the document does not contain, and tidying
+   it is how a document you did read gets recorded as one you did not. Pick a line that came out clean.
 7. Write one line of evidence: what that quotation tells you, and why the runner-up lost. "Header reads
    SAFETY DATA SHEET and section 3 lists hazard classifications, so not the CoA" is evidence; "appears to
    be an SDS" is not.

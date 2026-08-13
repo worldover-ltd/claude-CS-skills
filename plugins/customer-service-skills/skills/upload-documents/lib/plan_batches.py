@@ -37,6 +37,13 @@ READ_FROM = {
     "image": ("path",),
 }
 
+# The fields that put a picture in a conversation, and so the ones OCR text stands in for.
+PICTURE_FIELDS = ("images", "path")
+
+# Under this, what OCR read off a page is a scrap — a heading with nothing behind it, or the noise a
+# near-blank page returns. The picture is the better reading at that point, image slot and all.
+OCR_FLOOR = 120
+
 EXCEPTIONS = ("unbranched", "unidentified", "unmatched", "ambiguous", "archived", "unreadable")
 
 # The wider taxonomy a classifier proposes from when the app's own list holds nothing that fits. Passed
@@ -65,16 +72,42 @@ def key_for(path):
     return os.path.normcase(os.path.normpath(str(path).replace("\\", "/")))
 
 
+def ocr_stands_in(record):
+    """Whether what OCR read off this document is enough to identify it by, in place of its pictures.
+
+    Text earns the substitution twice over where there is enough of it. It costs no image slot, so a
+    batch of scans stops being three readings long; and it can be quoted against, which makes a scan the
+    same kind of answer as a Word document rather than the one kind whose reading nobody can check.
+    """
+    return bool(record.get("ocrTextFile")) and (record.get("ocrChars") or 0) >= OCR_FLOOR
+
+
+def fields_for(record):
+    """Which of the record's fields a classifier opens, with OCR text standing in for the pictures.
+
+    Returns None where `kind` names nothing readable, which is the caller's signal to except the file.
+    A record from a run that did not ask for OCR carries no OCR text, and so reads exactly as it did.
+    """
+    fields = READ_FROM.get(record.get("kind"))
+    if not fields or not ocr_stands_in(record):
+        return fields
+    # OCR text stands in *for pictures*, so a document that was never read as one keeps what it had.
+    # Nothing runs OCR over a document with its own text layer, but a manifest can outlive the run.
+    kept = tuple(f for f in fields if f not in PICTURE_FIELDS)
+    return fields if kept == fields else kept + ("ocrTextFile",)
+
+
 def read_from_for(record):
     """(paths, how many of them are pictures, why-not) — the files a classifier should open for this.
 
     Pictures are counted off the paths themselves rather than taken from `pagesRendered`, which counts
     rendered PDF pages and so is zero for a photograph the customer filed as a document. What the batch
-    budget cares about is images arriving in a conversation, and a JPEG is one of those.
+    budget cares about is images arriving in a conversation, and a JPEG is one of those — while an
+    `.ocr.md` standing in for that JPEG is not, and costs the batch nothing.
     """
     if record is None:
         return [], 0, "not in EXTRACTED.json — the extraction step did not see it"
-    fields = READ_FROM.get(record.get("kind"))
+    fields = fields_for(record)
     if not fields:
         note = record.get("note") or record.get("kind")
         return [], 0, f"nothing readable ({note})"

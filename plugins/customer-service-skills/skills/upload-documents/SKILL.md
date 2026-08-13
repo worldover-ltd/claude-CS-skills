@@ -259,14 +259,23 @@ That writes `DOCUMENTS.json`, skipping whatever Step 5 excluded, and reports the
 more than one item — one document belonging to several items, which is a row each rather than a problem.
 
 **Extract.** Invoke the `extract-document-text` skill, giving it `DOCUMENTS.json` as its input and
-`.workflow/active/${sessionId}` as its output directory, **with `--scans 3 --max-chars 4000`**. It writes
-`EXTRACTED.json`, one record per file with the Markdown or rendered pages a classifier can read.
+`.workflow/active/${sessionId}` as its output directory, **with `--scans 3 --max-chars 4000 --ocr`**. It
+writes `EXTRACTED.json`, one record per file with the Markdown, rendered pages or OCR text a classifier
+can read.
 
 Both numbers are there to bound what one agent is handed. Three pages, because page one of a scanned
 dossier is often its cover sheet, the least distinguishing page in it. Four thousand characters, kept as
 the head and the tail, because a document names itself at the top and carries its form number at the
 bottom — and because twenty uncapped documents in one conversation is what overflowed the context on the
 first run of this pipeline. The full conversion stays on disk either way.
+
+`--ocr` is what turns a scan into text, and it changes what the rest of this pipeline can do with one.
+A scan read as pictures costs image slots and cannot be quoted against; the same scan read as text costs
+neither and is checked like any other document. It needs a package the extraction skill does not declare,
+so that run is `uv run --with rapidocr-onnxruntime …`, and it is the slow part of the step — recognition
+is seconds a page against half a second a file for conversion. On a folder with few scans it costs almost
+nothing. On a folder that is mostly scans, start it before you need the answer, or drop the flag and
+accept reading them as pictures.
 
 **Batch.** Join the three files and cut the work into batches:
 
@@ -283,6 +292,11 @@ small and a batch of text is not. Images are what got dropped out of prompts mid
 count is of images rather than of rendered pages on purpose: a photograph the customer filed as a document
 renders no pages and is still an image in the conversation. Each batch carries only the document templates
 its own tables allow, so a classifier is never shown a choice the app would refuse.
+
+Where the extraction step read a scan with OCR and got enough to identify it by, **the text goes in place
+of the pictures** — so that reading costs no image slot, and the batch fills to twenty like any other.
+Where OCR came back with a scrap, the pictures go instead, because a heading with nothing behind it is a
+worse reading than the page itself.
 
 Six kinds of document never reach a batch, and it reports each separately: no branch covers it, the rule
 yielded no identifier, no item has that identifier, several items share it, the item is archived, or
