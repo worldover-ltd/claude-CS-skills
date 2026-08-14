@@ -56,7 +56,7 @@ def _split_joined(token, vocabulary):
     return parts if parts and len(parts) > 1 else None
 
 
-def _vocabulary(texts):
+def vocabulary(texts):
     """The words this folder writes as words, which is what a joined token can be split against."""
     seen = set()
     for text in texts:
@@ -83,10 +83,10 @@ def words(text, vocabulary=()):
 
 def frequency(texts):
     """How many documents each word appears on. The one number every decision here rests on."""
-    vocabulary = _vocabulary(texts)
+    known = vocabulary(texts)
     counted = Counter()
     for text in texts:
-        counted.update(set(words(text, vocabulary)))
+        counted.update(set(words(text, known)))
     return counted
 
 

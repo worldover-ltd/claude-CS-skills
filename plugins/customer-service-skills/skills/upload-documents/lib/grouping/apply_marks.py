@@ -58,6 +58,32 @@ def separating_wording(marked, held, texts):
     return [word for _, word in found[:3]]
 
 
+def separating_threshold(marked, held, session_dir, texts):
+    """The lowest stricter bar that stops putting the marked documents with the rest, or None.
+
+    Some forms are not wrong about *what* their members say, only about how much they had to share to be
+    counted as one. There is no wording to name in that case, and a number is still something a person can
+    be shown and argue with — which a change to the clustering code would not be.
+    """
+    if not marked or not held:
+        return None
+    written = group_documents.load(session_dir, "FORMS.json")
+    counted = mask_text.frequency(list(texts.values()))
+    known = mask_text.vocabulary(list(texts.values()))
+    floor = written.get("floor") or 2
+    members = list(marked) + list(held)
+    signatures = {sha: mask_text.signature(texts.get(sha, ""), counted, floor, known) for sha in members}
+
+    for bar in (0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9):
+        where = {}
+        for number, form in enumerate(group_documents.cluster(signatures, bar)):
+            for sha in form["members"]:
+                where[sha] = number
+        if not ({where[sha] for sha in marked} & {where[sha] for sha in held}):
+            return bar
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -93,8 +119,12 @@ def main():
 
         held = [sha for sha in form["members"] if sha not in marked]
         wording = separating_wording(marked, held, texts)
+        tighter = None if wording else separating_threshold(marked, held, session_dir, texts)
         if wording:
             rules.append({"form": reviewed["formId"], "wording": wording,
+                          "from": {"marked": len(marked), "held": len(held)}})
+        elif tighter:
+            rules.append({"form": reviewed["formId"], "threshold": tighter,
                           "from": {"marked": len(marked), "held": len(held)}})
         else:
             dissolved.append(reviewed["formId"])

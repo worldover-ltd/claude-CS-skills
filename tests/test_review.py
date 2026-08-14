@@ -85,6 +85,14 @@ class ReviewPageTest(unittest.TestCase):
         self.assertEqual(form["randomShown"],
                          sum(1 for s in form["samples"] if s["block"] == "random"))
 
+    def test_what_the_sample_leaves_out_is_stated(self):
+        # A sample bounds what anybody sees, and silence about that reads as "everything was checked".
+        self.session.run(REVIEW, "build_review.py", "--random", "3", "--suspect", "2")
+        form = self.session.read("REVIEW.json")["forms"][0]
+        self.assertEqual(form["randomShown"], 3)
+        self.assertEqual(form["suspectShown"], 2)
+        self.assertEqual(form["notShown"], form["documents"] - 5)
+
     def test_the_form_carries_its_name_to_the_page(self):
         self.session.run(REVIEW, "build_review.py")
         form = self.session.read("REVIEW.json")["forms"][0]

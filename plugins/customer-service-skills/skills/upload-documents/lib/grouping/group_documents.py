@@ -106,34 +106,49 @@ def cluster(signatures, threshold):
     return forms
 
 
+def _parts_of(form, wording, texts):
+    """One form's members split by whether they all carry the given wording."""
+    held, apart = [], []
+    for sha in form["members"]:
+        body = texts.get(sha, "").upper()
+        (held if all(word in body for word in wording) else apart).append(sha)
+    return [(held, list(wording)), (apart, [f"not {word}" for word in wording])]
+
+
 def apply_rules(forms, rules, texts, signatures):
-    """Split forms the repair path has been told to split, on wording somebody could name.
+    """Split forms the repair path has been told to split, and say on what.
 
     A rule is the shape a person's marks take once they have been turned into something the script can
-    apply to every member rather than only to the ones that were looked at.
+    apply to every member rather than only to the ones that were looked at. Two kinds, because two things
+    can be wrong: wording, when the members differ in what they say, and a raised threshold, when they
+    differ only in degree and the first pass was too generous.
     """
-    by_id = {form["id"]: form for form in forms}
     out = []
     for form in forms:
         rule = next((r for r in rules if r.get("form") == form["id"]), None)
         wording = [w.upper() for w in (rule or {}).get("wording") or []]
-        if not rule or not wording:
+        threshold = (rule or {}).get("threshold")
+
+        if rule and wording:
+            parts = _parts_of(form, wording, texts)
+        elif rule and threshold:
+            # Re-run the same clustering over this form's members alone, held to a stricter bar.
+            parts = [(tighter["members"], [f"threshold {threshold}"])
+                     for tighter in cluster({s: signatures[s] for s in form["members"]}, threshold)]
+        else:
             out.append(form)
             continue
-        held, apart = [], []
-        for sha in form["members"]:
-            body = texts.get(sha, "").upper()
-            (held if all(word in body for word in wording) else apart).append(sha)
-        for part in (held, apart):
-            if not part:
+
+        for members, why in parts:
+            if not members:
                 continue
             out.append({
-                "seed": frozenset.intersection(*(signatures[s] for s in part)) if part else frozenset(),
-                "members": part,
-                "fit": {s: form["fit"].get(s, 1.0) for s in part},
-                "splitBy": wording if part is held else [f"not {w}" for w in wording],
+                "seed": frozenset.intersection(*(signatures[s] for s in members)),
+                "members": members,
+                "fit": {s: form["fit"].get(s, 1.0) for s in members},
+                "splitBy": why,
             })
-    return out or list(by_id.values())
+    return out
 
 
 def sweep(texts, counted, options):
@@ -199,7 +214,7 @@ def main():
         return
 
     counted = mask_text.frequency(list(texts.values()))
-    options.vocabulary = mask_text._vocabulary(list(texts.values()))
+    options.vocabulary = mask_text.vocabulary(list(texts.values()))
     floor = max(2, round(options.floor_fraction * len(texts)))
 
     if options.sweep:

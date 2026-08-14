@@ -202,6 +202,19 @@ class GroupingTest(unittest.TestCase):
         session.group()
         self.assertGreater(len(session.forms()["forms"]), before)
 
+    def test_a_threshold_rule_splits_a_form_more_strictly(self):
+        # Some forms are not wrong about what their members say, only about how much they had to share.
+        # A number is still something a person can be shown, unlike a change to the clustering code.
+        session = self.session()
+        session.group()
+        before = len(session.forms()["forms"])
+        (Path(self.directory.name) / "SPLIT_RULES.json").write_text(
+            json.dumps({"rules": [{"form": "f01", "threshold": 0.95}]}), encoding="utf-8")
+        session.group()
+        after = session.forms()["forms"]
+        self.assertGreater(len(after), before)
+        self.assertTrue(any("threshold" in " ".join(f.get("splitBy") or []) for f in after))
+
     def test_the_sweep_reports_without_writing_forms(self):
         session = self.session()
         session.group()

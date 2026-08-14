@@ -26,14 +26,36 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "grouping"))
-import group_documents  # noqa: E402
-
 RANDOM, SUSPECT = 8, 6
 WIDTH, QUALITY = 700, 66
 LINES = 14
 # A published page has a hard ceiling, and scans are most of what fills it.
 BUDGET_MB = 14.0
+
+
+def load(session_dir, name):
+    """One of the run's manifests. This folder reads the grouping step's output as data, never as code —
+    the two talk through JSON like every other seam in this skill, so either can be lifted out alone."""
+    path = session_dir / name
+    if not path.is_file():
+        raise SystemExit(f"missing {name} in {session_dir} — the step that writes it has not run")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def first_lines(record, count):
+    """The head of whatever was read of one document, for a sample with no rendered page to show."""
+    best = ""
+    for field in ("textFile", "ocrTextFile"):
+        source = record.get(field)
+        if not source:
+            continue
+        try:
+            body = Path(source).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if len(body) > len(best):
+            best = body
+    return [line for line in best.splitlines() if line.strip()][:count]
 
 
 def thumbnail(path, width, quality):
@@ -81,17 +103,14 @@ def main():
 
     import random as randomness
     session_dir = options.session_dir
-    forms = group_documents.load(session_dir, "FORMS.json")
+    forms = load(session_dir, "FORMS.json")
     if forms.get("skipped"):
         raise SystemExit(f"nothing to review: {forms['skipped']}")
 
-    named = {f["formId"]: f for f in
-             (group_documents.load(session_dir, "NAMED.json").get("forms") or [])} \
+    named = {f["formId"]: f for f in (load(session_dir, "NAMED.json").get("forms") or [])} \
         if (session_dir / "NAMED.json").is_file() else {}
-    documents = {d["sha"]: d for d in group_documents.load(session_dir, "DOCUMENTS.json")}
-    extracted = {r["path"]: r for r in
-                 (group_documents.load(session_dir, "EXTRACTED.json").get("documents") or [])}
-    texts, _ = group_documents.texts_by_sha(session_dir)
+    documents = {d["sha"]: d for d in load(session_dir, "DOCUMENTS.json")}
+    extracted = {r["path"]: r for r in (load(session_dir, "EXTRACTED.json").get("documents") or [])}
 
     chooser = randomness.Random(options.seed)
     out, embedded, drawn = [], 0, 0
@@ -118,7 +137,7 @@ def main():
                     "path": (document.get("path") or "").replace("/", "\\"),
                     "fit": fit.get(sha, 1.0),
                     "image": picture,
-                    "lines": None if picture else texts.get(sha, "").splitlines()[:LINES],
+                    "lines": None if picture else first_lines(record, LINES),
                 })
                 drawn += 1
 
@@ -129,6 +148,9 @@ def main():
             "description": entry.get("description") or "",
             "documents": len(members),
             "randomShown": len(fair),
+            "suspectShown": len(suspect),
+            # Said rather than left to subtraction: a sample that bounds coverage has to admit by how much.
+            "notShown": len(members) - len(fair) - len(suspect),
             "samples": samples,
         })
 
@@ -138,6 +160,10 @@ def main():
     size = written.stat().st_size / 1024 / 1024
 
     print(f"{len(out)} form(s), {drawn} sample(s) to look at, {embedded} with a rendered page")
+    hidden = sum(form["notShown"] for form in out)
+    if hidden:
+        print(f"  {hidden} document(s) are in a form but not shown — a sample bounds what anyone sees, "
+              f"and the fair block is the only part a rate is counted from")
     if not embedded and any(s["lines"] for f in out for s in f["samples"]):
         print("  no rendered pages — samples carry their first lines of text instead")
     if size > BUDGET_MB:

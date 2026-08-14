@@ -53,7 +53,7 @@ def main():
     texts, _ = group_documents.texts_by_sha(session_dir)
     names = {d["sha"]: d["name"] for d in group_documents.load(session_dir, "DOCUMENTS.json")}
     header_lines = forms.get("headerLines", 8)
-    vocabulary = mask_text._vocabulary(list(texts.values()))
+    vocabulary = mask_text.vocabulary(list(texts.values()))
 
     task_dir = session_dir / "naming"
     task_dir.mkdir(parents=True, exist_ok=True)
