@@ -132,6 +132,17 @@ class SectionAnswerTest(unittest.TestCase):
         self.assertEqual(by_template["dt_sds"]["section"], "Safety")
         self.assertTrue(settled["kept"])
 
+    def test_the_key_keeps_the_punctuation_the_apps_own_keys_keep(self):
+        # A real export spells it `declarations_&_certificates`. Folding the `&` away derives an id the
+        # app's own would not match, and the two reference sheets stop joining.
+        self.session.answer([
+            {"documentTemplateId": "dt_sds", "itemTemplate": "Active Material", "section": "Safety"},
+            {"documentTemplateId": "dt_sup", "itemTemplate": "Standard",
+             "section": "Declarations & Certificates"}])
+        self.session.run("collect_sections.py")
+        by_template = {p["documentTemplateId"]: p for p in self.session.read("SECTIONS.json")["pairs"]}
+        self.assertEqual(by_template["dt_sup"]["sectionKey"], "declarations_&_certificates")
+
     def test_a_pair_nobody_answered_is_named_rather_than_defaulted(self):
         self.session.answer([
             {"documentTemplateId": "dt_sds", "itemTemplate": "Active Material", "section": "Safety"}])

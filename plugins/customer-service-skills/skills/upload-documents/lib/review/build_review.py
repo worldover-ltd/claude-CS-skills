@@ -159,8 +159,10 @@ def main():
         by_fill = sorted((sha for sha in members if sha not in taken),
                          key=lambda s: (how_filled(extracted.get((documents.get(s) or {}).get("path"))
                                                    or {}), s))
-        half = max(1, options.filled // 2) if options.filled else 0
-        filled = (by_fill[:half] + by_fill[-half:])[:options.filled] if by_fill else []
+        # Both ends, and never the same member twice: with three left to choose from, the bottom two and
+        # the top two overlap in the middle, and a strip showing one document twice reads as two.
+        half = min(max(1, options.filled // 2), len(by_fill) // 2) if options.filled else 0
+        filled = by_fill[:half] + by_fill[len(by_fill) - half:] if half else by_fill[:options.filled]
 
         samples = []
         for block, chosen in (("random", fair), ("suspect", suspect), ("filled", filled)):

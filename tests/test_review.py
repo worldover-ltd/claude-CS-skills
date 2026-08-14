@@ -112,6 +112,14 @@ class ReviewPageTest(unittest.TestCase):
         self.assertEqual(len(filled), 2)
         self.assertLess(min(s["filled"] for s in filled), max(s["filled"] for s in filled))
 
+    def test_no_member_is_shown_twice_when_the_form_runs_short(self):
+        # With three left over and a block of four wanted, both ends overlap in the middle, and a card
+        # shown twice reads as two documents.
+        self.session.run(REVIEW, "build_review.py", "--random", "8", "--suspect", "1", "--filled", "4")
+        form = self.session.read("REVIEW.json")["forms"][0]
+        shown = [sample["sha"] for sample in form["samples"]]
+        self.assertEqual(len(shown), len(set(shown)))
+
     def test_the_form_carries_its_name_to_the_page(self):
         self.session.run(REVIEW, "build_review.py")
         form = self.session.read("REVIEW.json")["forms"][0]

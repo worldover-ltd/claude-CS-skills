@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 SAMPLE = 14
-PUNCTUATION = re.compile(r"[^a-z0-9]+")
+SPACES = re.compile(r"\s+")
 
 
 def load(session_dir, name):
@@ -33,7 +33,13 @@ def load(session_dir, name):
 
 
 def key_for(label):
-    return PUNCTUATION.sub("_", (label or "").casefold()).strip("_")
+    """`DOCUMENT_WORKBOOK_FORMAT.md`'s rule exactly: lower-cased, spaces as underscores.
+
+    Nothing else is stripped, and that is not an oversight — the app's own keys keep their punctuation
+    (`Declarations & Certificates` is `declarations_&_certificates` in a real export). Folding the `&`
+    away here would derive a section id that no longer matches the app's.
+    """
+    return SPACES.sub("_", " ".join((label or "").casefold().split()))
 
 
 def section_id(item_template, label):

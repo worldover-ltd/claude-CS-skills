@@ -1,6 +1,6 @@
 # Classifying the documents
 
-How Step 9 turns a folder of extracted documents into one document template, a runner-up, a confidence and
+How Step 10 turns a folder of extracted documents into one document template, a runner-up, a confidence and
 a line of evidence. `plan_form_classification.py` and `plan_batches.py` have already written the input
 files; this page is what to do with them.
 
@@ -118,6 +118,11 @@ But a pick that does not fit is worse than a proposal, not better. It attaches s
 is wrong, and nothing downstream can tell it from a good one. If the closest thing on the list is not what
 this document is, say so with a proposal and name what it actually is. "Nearest available" is not an
 answer.
+
+Where a document carries `splitsInto`, that is what the customer said tells these apart — documents
+printed on the same form that their app calls different things. Read it before you decide, and apply it:
+it is about this batch's documents specifically, and it beats your own reading of which template is
+closest.
 
 For each document in that list:
 

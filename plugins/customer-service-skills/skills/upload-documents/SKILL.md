@@ -132,7 +132,7 @@ substance, which is worse than no row at all.
 Send **one sub agent**, briefed per
 `${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/references/PREFLIGHT.md`, to settle its
 two questions: `uv`, which reads the documents in Step 6, and a Python with `openpyxl`, which writes the
-workbook in Step 13.
+workbook in Step 14.
 
 Either one missing stops the run, as that reference describes: tell the user which and what it blocks,
 then wait.
@@ -328,7 +328,7 @@ Three passes, all in `references/GROUPING_DOCUMENTS.md`:
 
 It writes `FORMS.json`, and reports how many forms it found and how strongly their members joined. The two
 settings that decide that are recorded beside the answer, and `--sweep` shows what other settings would
-do. A folder under about forty documents is **skipped and says so** — go straight to Step 9, and every
+do. A folder under about forty documents is **skipped and says so** — go straight to Step 10, and every
 document there is read one at a time as it always was.
 
 **Name.** `plan_naming.py`, then one sub agent per form carrying five members' *structure view*, then
@@ -336,28 +336,8 @@ document there is read one at a time as it always was.
 not choosing a type, and offering the app's list here is what turned a form the app had no word for into
 nine hundred `Questionnaire`s on the run this came from.
 
-**Confirm.** Build the review page, publish it, and give the user the link —
-`references/REVIEWING_BY_EYE.md`. They mark the documents that do not belong and say, per form, whether
-the grouping holds and whether the name fits. Read their paste back with `read_verdict.py`.
-
-There is no ground truth in a run: nobody knows which documents share a form until somebody looks. **So
-this confirmation is the only calibration the settings ever get, and it is not optional.** It is now the
-only check on three separate things — the grouping settings, whether a form's name led its classification,
-and whether a form holds more than one kind of document. A run nobody reviews has no check on any of them.
-
-Where a form comes back failing, `apply_marks.py` turns the marks into wording rules the same script
-re-reads — or dissolves the form, and its documents are classified one at a time as they always were.
-
-**A third answer about the grouping matters here**: *same paper, different documents*. Some forms hold
-documents the app calls different things because what separates them was typed in rather than printed — a
-blank specification and the same sheet with its results filled in. Nothing is wrong with that grouping and
-nothing dissolves; the form is marked **split by value** and its documents are read one at a time, which
-is the one place that price is worth paying. The person also says what it splits into, in their words, and
-that reaches the reading as data for that form alone.
-
-Done when the user has seen the forms and confirmed them, `NAMED.json` holds a title and description for
-each, and whatever they rejected is either split by a rule, marked split by value, or dissolved into
-`readOneAtATime`.
+Done when `FORMS.json` holds the forms and `NAMED.json` a title and description for each. Nobody has seen
+them yet — that is Step 9, and the gate goes first so they see it with the gap already on the table.
 
 # Step 8 — hold the forms up against the app's list
 
@@ -389,7 +369,36 @@ the customer's `Certificate of Analysis (CoA)` is the user's call, not this scri
 Done when the user has seen the gap and said which road, and either the export has been re-taken or the
 run is carrying the misses knowingly.
 
-# Step 9 — classify, and reconcile
+# Step 9 — confirm the forms by eye
+
+Build the review page, publish it, and give the user the link — `references/REVIEWING_BY_EYE.md`. They
+mark the documents that do not belong and say, per form, whether the grouping holds and whether the name
+fits. Read their paste back with `read_verdict.py`.
+
+They come to this having just seen Step 8's gap, which is the right order: knowing the app has no template
+for a form is exactly the context for judging whether that form is real.
+
+There is no ground truth in a run: nobody knows which documents share a form until somebody looks. **So
+this confirmation is the only calibration the settings ever get, and it is not optional.** It is now the
+only check on three separate things — the grouping settings, whether a form's name led its classification,
+and whether a form holds more than one kind of document. A run nobody reviews has no check on any of them.
+
+Where a form comes back failing, `apply_marks.py` turns the marks into wording rules the same script
+re-reads — or dissolves the form, and its documents are classified one at a time as they always were.
+Applying a wording rule means running `group_documents.py` again, which makes new forms: name them, run
+the gate over them, and show them again.
+
+**A third answer about the grouping matters here**: *same paper, different documents*. Some forms hold
+documents the app calls different things because what separates them was typed in rather than printed — a
+blank specification and the same sheet with its results filled in. Nothing is wrong with that grouping and
+nothing dissolves; the form is marked **split by value** and its documents are read one at a time, which
+is the one place that price is worth paying. The person also says what it splits into, in their words, and
+that sentence travels with those documents into the reading.
+
+Done when the user has seen the forms and confirmed them, and whatever they rejected is either split by a
+rule, marked split by value, or dissolved into `readOneAtATime`.
+
+# Step 10 — classify, and reconcile
 
 **Ask the form, not its documents.** Every document printed on one form is the same kind of document, so
 one answer covers all of them — 84 readings instead of 1,887 on the folder this came from. `docs/adr/0005`
@@ -461,7 +470,7 @@ Done when `CLASSIFICATIONS.json` holds one entry per batched document, every bat
 reported as unanswered, `REREAD.json` is empty or its round has been run, and the exception pile has been
 through the user.
 
-# Step 10 — set the answers against each other
+# Step 11 — set the answers against each other
 
 Every check above judges one answer alone, which is how one line quoted from four hundred documents came
 back as three different templates without anything noticing.
@@ -480,7 +489,7 @@ which is the point of showing them together.
 
 Done when `CONTRADICTIONS.json` exists and anything in it has been settled or knowingly carried.
 
-# Step 11 — arrange the Documents tab
+# Step 12 — arrange the Documents tab
 
 Every document now has a template, so where each kind belongs can be answered from the rows themselves —
 no file is opened and no extracted text is read.
@@ -506,7 +515,7 @@ says `yes` on yellow and `no` on green. That is the review — do not put 58 row
 
 Done when `SECTIONS.json` holds a section for every pair, or names the ones nobody answered.
 
-# Step 12 — show the workbook before building it
+# Step 13 — show the workbook before building it
 
 Load the `artifact-design` skill, then publish one **markdown** artifact to
 `.workflow/active/${sessionId}/tree.md` holding, in this order:
@@ -530,7 +539,7 @@ The sheet preview is what the user can judge, so fill it with real values rather
 Iterate: take their corrections, update `CLASSIFICATIONS.json`, republish to the same file path so the URL
 holds. Done when the user approves what the artifact shows.
 
-# Step 13 — write the workbook
+# Step 14 — write the workbook
 
 Build the Excel file per
 `${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/references/DOCUMENT_WORKBOOK_FORMAT.md`, writing it
@@ -548,7 +557,7 @@ Done when every file under the folder appears exactly once — a data sheet row,
 a `FILES_WITH_ISSUES` row — every identifier value traces back to a row in `ITEMS.csv`, and the file loads
 back with the row counts `CLASSIFICATIONS.json` predicted.
 
-# Step 14 — hand it over
+# Step 15 — hand it over
 
 Give the user the full path to `DOCUMENT_UPLOAD_WORKBOOK.xlsx` — it is in their own documents folder, so
 say that, since the last version of this skill left it somewhere they had to be shown. Then one line per

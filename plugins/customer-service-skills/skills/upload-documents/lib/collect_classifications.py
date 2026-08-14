@@ -177,7 +177,7 @@ def settle(answered, given):
     return held_up[0], None, None, True
 
 
-def form_verdicts(session_dir, manifest, app):
+def form_verdicts(session_dir, manifest):
     """{readingId: verdict} for readings whose whole form was answered at once, or {} where none was.
 
     The verdict carries `viaForm` and `standsFor` so nothing downstream can mistake this for a reading
@@ -260,7 +260,7 @@ def main():
     # the list that form was offered and against the samples it was shown. They are marked so a row can
     # say where its answer came from: five members of the form were read, and the rest are carried by
     # the claim that they are the same stationery. See docs/adr/0005.
-    by_form = form_verdicts(session_dir, first_round, app)
+    by_form = form_verdicts(session_dir, first_round)
 
     # Checked once per reading rather than once per copy: every copy of one content was answered by one
     # agent, so a fabricated answer is one fact about that reading, not a fact about forty files.
@@ -337,8 +337,12 @@ def main():
             "quote": verdict.get("quote"),
             "review": verdict.get("review"),
             # Empty for a document somebody's agent actually read, filled where the answer is the
-            # form's. A quote on such a row came off a sampled member, not off this file.
+            # form's. A quote on such a row came off a sampled member, not off this file, and the two
+            # counts say by how much: five read, a thousand carried. ADR-0005 requires the row to be
+            # able to say so rather than leaving the workbook to imply somebody looked at this file.
             "viaForm": verdict.get("viaForm"),
+            "standsFor": verdict.get("standsFor"),
+            "sampled": verdict.get("sampled"),
         }
         relative_path = document["relativePath"]
 

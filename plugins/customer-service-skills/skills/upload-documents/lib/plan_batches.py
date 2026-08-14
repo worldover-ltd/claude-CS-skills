@@ -218,6 +218,22 @@ def form_membership(session_dir):
     return {sha: form["id"] for form in body.get("forms") or [] for sha in form["members"]}
 
 
+def split_rules(session_dir):
+    """{formId: what the person said it splits into}, for forms read one document at a time.
+
+    These documents are the hardest ones in the folder by definition — same stationery, and the app calls
+    them different things — so the one thing that helps is the sentence the person wrote at the review.
+    It travels to the reading as data for that form alone and is never carried to another customer; see
+    docs/adr/0003 on why named tie-break pairs were rejected.
+    """
+    path = session_dir / "SPLIT_RULES.json"
+    if not path.is_file():
+        return {}
+    body = json.loads(path.read_text(encoding="utf-8"))
+    return {entry["form"]: entry.get("splitsInto")
+            for entry in body.get("splitByValue") or [] if entry.get("splitsInto")}
+
+
 def report(heading, rows):
     if not rows:
         return
@@ -350,6 +366,7 @@ def main():
     # by document. See docs/adr/0005.
     answered_forms = form_answers(session_dir)
     form_of = form_membership(session_dir)
+    splits = split_rules(session_dir)
     by_form = []
     if answered_forms:
         held = []
@@ -361,6 +378,11 @@ def main():
             else:
                 held.append(reading)
         readings = held
+
+    for reading in readings:
+        rule = splits.get(form_of.get(reading["sha"]))
+        if rule:
+            reading["splitsInto"] = rule
 
     ready.sort(key=lambda d: d["relativePath"])
     readings.sort(key=lambda r: (r["table"], sorted(r["files"])[0]))
@@ -379,7 +401,9 @@ def main():
             "fallbackTemplates": str(FALLBACK_TEMPLATES).replace("\\", "/"),
             "vocabulary": vocabulary_for(app, chunk),
             "documents": [
-                {k: r[k] for k in ("readingId", "table", "folderHints", "readFrom")} for r in chunk
+                {**{k: r[k] for k in ("readingId", "table", "folderHints", "readFrom")},
+                 **({"splitsInto": r["splitsInto"]} if r.get("splitsInto") else {})}
+                for r in chunk
             ],
         }
         input_path = batch_dir / f"batch_{number:03d}.json"

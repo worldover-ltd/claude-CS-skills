@@ -94,6 +94,25 @@ class CompareTest(unittest.TestCase):
         self.assertEqual(len(reused), 1)
         self.assertEqual(reused[0]["forms"], ["f01", "f02"])
 
+    def test_evidence_naming_a_type_the_answer_did_not_pick_is_surfaced(self):
+        # The backstop to the gate: an agent writing one type's name while filing the document as
+        # another is the run reporting that the list it was handed may be short.
+        rows = [row(n, "Certificate of Analysis", f"batch results {n} of the lot",
+                    "Reads as a technical data sheet; filed as the nearest thing on the list.")
+                for n in range(5)]
+        session = Session(self.directory.name, rows)
+        result = session.run()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        named = session.read("CONTRADICTIONS.json")["namedButNotPicked"]
+        self.assertTrue(any("technical data sheet" in entry["type"] for entry in named), named)
+
+    def test_evidence_naming_the_type_it_was_filed_as_is_not_surfaced(self):
+        rows = [row(n, "Certificate of Analysis", f"batch results {n} of the lot",
+                    "The header reads certificate of analysis.") for n in range(5)]
+        session = Session(self.directory.name, rows)
+        session.run()
+        self.assertEqual(session.read("CONTRADICTIONS.json")["namedButNotPicked"], [])
+
     def test_answers_that_came_from_a_form_are_not_compared(self):
         rows = [row(n, "Supplier Change Form", HEADER, "The form's own evidence.", via="f01")
                 for n in range(10)]

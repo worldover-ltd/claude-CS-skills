@@ -113,9 +113,17 @@ it surfaces the genuinely ambiguous documents rather than the badly-scanned ones
 
 A data row carries no section. A section groups templates rather than documents, so it is a property of the
 template and lives on the `Document Templates` sheet — the same shape the app has, where
-`section_attachments` links a section to a document template and never to a document. Nobody chooses it:
-the section is whichever one on that row's *item_template* renders the template the document turned out to
-be, which is why one document under two *item_template*s can sit in two differently-named sections.
+`section_attachments` links a section to a document template and never to a document. Nobody chooses it
+while a document is being read: the section is whichever one on that row's *item_template* renders the
+template the document turned out to be, which is why one document under two *item_template*s can sit in
+two differently-named sections.
+
+**Both reference sheets are built from `SECTIONS.json`**, which `collect_sections.py` writes after every
+document has a template — one entry per (document template, item template) pair, carrying its section, the
+derived `sectionId`, and `isNew`. Take `section_id` and `is_new` from there rather than from the export:
+the export only knows the sections the app already had, and on one real customer that was 5 sections
+against 58 pairs. A pair missing from `SECTIONS.json` — nobody answered for it — keeps an empty
+`section_id` and `is_new` of `no`, which is the old behaviour and still attaches.
 
 Where the app attaches documents through a link table rather than a column, the identifier column still
 comes first and still names the item — the app agent resolves the link. Say which shape the app has in
@@ -185,8 +193,11 @@ has to unarchive if its documents are wanted.
 - Every row's `file_sha` appears in `DOCUMENTS.json`, and every `documentTemplateId` in
   `Document Templates` — and in `WORKFLOW.json`, since the workbook derives no template id.
 - Every `Document Templates` row names a template the app allows on that row's `table`, and carries either
-  a `section_id` that appears in `Document Sections` or an empty one where no section was picked; every
-  section listed holds at least one template.
+  a `section_id` that appears in `Document Sections` or an empty one where nobody answered for that pair;
+  every section listed holds at least one template.
+- Every `(document template, item template)` pair in `SECTIONS.json` has a `Document Templates` row, and
+  its `section_id` and `is_new` match what that file says. The section step is where those two values are
+  decided; a workbook that recomputes them has two answers to one question.
 - Every file under the folder is in exactly one place: a data sheet row, an `IGNORED_FILES` row, or a
   `FILES_WITH_ISSUES` row. Distinct file paths across the three add up to the count `map_tree.py`
   reported, less the workbook itself. Excluded files never enter `DOCUMENTS.json`, so the tree's total is

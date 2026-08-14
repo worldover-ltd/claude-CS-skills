@@ -3,14 +3,15 @@
 Usage:
     python3 check_vocabulary.py <session_dir> [--match 0.6]
 
-Reads `NAMED.json`, `FORMS.json` and `WORKFLOW.json`; writes `VOCABULARY_GAP.json` and prints what the
-app has no word for, with the number of documents behind each one.
+Reads `NAMED.json` and `WORKFLOW.json`; writes `VOCABULARY_GAP.json` and prints what the app has no word
+for, with the number of documents behind each one.
 
 This runs where it does — after naming, before classifying — because that is the only moment the run
 knows both what the documents are and what the app can call them, and can still act on the difference.
-On the folder this came from, three forms carrying 1,808 of 1,887 documents had no template in the app.
-Every one of those documents was filed under the closest name on the list instead, and 1,016 of them
-became `Questionnaire`. The same folder run against an app that *had* those templates produced none.
+Measured on one real folder, three forms carrying 1,808 of 1,887 documents had no template in the app.
+Every one of those documents was filed under the closest name on the list instead, and 1,016 of the 1,113
+answers carrying a form number became `Questionnaire`. The same folder run against an app that *had*
+those templates produced none of them.
 
 Nothing here decides anything. A near match is reported with its score rather than accepted, because the
 cost of being wrong is a document filed against a template the customer means something else by, and the

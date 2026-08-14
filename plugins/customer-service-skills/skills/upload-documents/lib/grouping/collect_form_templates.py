@@ -110,8 +110,9 @@ def main():
         names = offered(payload)
         why = why_not_usable(answer, names, shown_text(payload))
         if why:
+            # Reported once. A rejection and a silence both need re-sending, but they are different
+            # things to read: one form answered badly, the other did not answer.
             rejected.append((task["formId"], why))
-            missing.append((task["formId"], why))
             continue
 
         template_id = answer.get("documentTemplateId")
@@ -133,14 +134,18 @@ def main():
         if entry["proposedTemplate"]:
             proposals.append(entry)
 
+    resend = missing + rejected
     written = {"forms": settled,
                "missing": [{"formId": f, "why": w} for f, w in missing],
                "rejected": [{"formId": f, "why": w} for f, w in rejected],
+               "sendAgain": [f for f, _ in resend],
                "documentsSettled": sum(f["documents"] for f in settled)}
     (session_dir / "FORM_TEMPLATES.json").write_text(json.dumps(written, indent=2), encoding="utf-8")
 
     print(f"{len(settled)}/{len(tasks)} form(s) answered, standing for "
           f"{written['documentsSettled']} document(s)")
+    if rejected:
+        print(f"  {len(rejected)} answered but did not hold up; {len(missing)} did not answer")
     for form in settled[:SAMPLE]:
         called = form["documentTemplateName"] or f"proposed: {form['proposedTemplate']}"
         print(f"  {form['formId']}  {form['documents']:5d} documents  {(form['title'] or '')[:38]:38s} "
@@ -155,9 +160,9 @@ def main():
             print(f"  {form['formId']}  {form['proposedTemplate']}")
         print("  the app has no template for these; somebody creates them before those documents attach")
 
-    if missing:
-        print(f"\nSEND THESE AGAIN ({len(missing)}):")
-        for form_id, why in missing[:SAMPLE]:
+    if resend:
+        print(f"\nSEND THESE AGAIN ({len(resend)}):")
+        for form_id, why in resend[:SAMPLE]:
             print(f"  {form_id} — {why}")
 
     print(f"\n-> {session_dir / 'FORM_TEMPLATES.json'}")

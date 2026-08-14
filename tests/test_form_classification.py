@@ -132,6 +132,20 @@ class FormClassificationTest(unittest.TestCase):
         self.assertEqual(planned["tasks"], [])
         self.assertEqual(planned["skipped"][0]["formId"], "f01")
 
+    def test_what_a_split_form_splits_into_reaches_the_reading(self):
+        # Recording the person's sentence and never delivering it would leave the hardest documents in
+        # the folder read with no more to go on than before they said anything.
+        self.session.write("SPLIT_RULES.json", {
+            "rules": [], "dissolved": [], "readOneAtATime": [], "renameThese": [],
+            "splitByValue": [{"form": "f01", "documents": 12,
+                              "splitsInto": "Product Specification where the results column is blank"}]})
+        self.session.run(GROUPING, "plan_form_classification.py")
+        result = self.session.run(LIB, "plan_batches.py")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        entry = self.session.read("BATCHES.json")["batches"][0]
+        payload = json.loads(Path(entry["input"]).read_text(encoding="utf-8"))
+        self.assertIn("results column is blank", payload["documents"][0]["splitsInto"])
+
     def test_an_answer_quoting_something_it_was_never_shown_is_refused(self):
         self.session.run(GROUPING, "plan_form_classification.py")
         self.session.answer_the_form(quote="CERTIFICATE OF ANALYSIS FOR BATCH 4471")
@@ -184,6 +198,15 @@ class FanOutTest(unittest.TestCase):
         self.assertTrue(all(r["documentTemplate"] == "Supplier Change Form" for r in rows))
         # The provenance is the point: none of these files was read, the form they share was.
         self.assertTrue(all(r["viaForm"] == "f01" for r in rows))
+
+    def test_a_row_says_how_many_documents_its_answer_stood_for(self):
+        # ADR-0005: five members were read and twelve are carried, and the workbook must not imply
+        # somebody looked at this file.
+        self.session.run(LIB, "plan_batches.py")
+        self.session.run(LIB, "collect_classifications.py")
+        row = self.session.read("CLASSIFICATIONS.json")["results"][0]
+        self.assertEqual(row["standsFor"], 12)
+        self.assertEqual(row["sampled"], 5)
 
     def test_a_form_answer_is_not_compared_against_itself(self):
         # One answer per form by construction, so a form's members cannot contradict each other and

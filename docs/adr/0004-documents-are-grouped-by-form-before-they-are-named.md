@@ -8,8 +8,12 @@ shape. Every check the pipeline had was **per reading**: nothing ever compared o
 sixty-eight documents printed on one form came back as forty-four Product Specifications, twenty-two
 Certificates of Analysis and two Technical Data Sheets — spread over twenty-five batches whose answers
 were each internally consistent, meaning the type was a property of the agent rather than of the document.
-And 1,113 documents named a form in their own evidence that the app's list did not contain; every one was
-filed under a list template anyway, 979 of them as `Questionnaire`.
+And 1,113 answers carried a form number in their own evidence — a name for the document in the customer's
+vocabulary that the app's list did not hold. Every one was filed under a list template anyway, 1,016 of
+them as `Questionnaire`. (Both figures were re-derived from the run artefacts on 2026-08-14. This ADR
+first said "1,113 documents named a form the list did not contain… 979 of them as `Questionnaire`": 1,113
+counts form numbers rather than out-of-list type names, which is 343, and the Questionnaire count was
+under by 37.)
 
 Neither is fixable one document at a time. A form is the unit that makes them visible: two copies of one
 form cannot receive different answers if the form is what gets answered, and a form of 1,211 documents

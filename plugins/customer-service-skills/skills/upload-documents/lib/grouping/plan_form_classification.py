@@ -44,22 +44,23 @@ def split_by_value(session_dir):
     return {entry["form"]: entry.get("splitsInto") for entry in body.get("splitByValue") or []}
 
 
-def tables_for(session_dir, members):
-    """The app tables this form's documents sit on, so its list is scoped the way a batch's would be."""
-    branches = json.loads((session_dir / "BRANCHES.json").read_text(encoding="utf-8")).get("branches") \
-        if (session_dir / "BRANCHES.json").is_file() else None
-    documents = group_documents.load(session_dir, "DOCUMENTS.json")
+def tables_by_sha(session_dir):
+    """{sha: {tables}} — which app table each document sits on, resolved once for the whole folder.
+
+    Once, because the branch rules are the same for every form and re-walking every path per form is
+    the folder read seventeen times over.
+    """
+    if not (session_dir / "BRANCHES.json").is_file():
+        return {}
+    branches = json.loads((session_dir / "BRANCHES.json").read_text(encoding="utf-8")).get("branches")
     if not branches:
-        return []
-    held = set(members)
-    tables = set()
-    for document in documents:
-        if document["sha"] not in held:
-            continue
+        return {}
+    tables = {}
+    for document in group_documents.load(session_dir, "DOCUMENTS.json"):
         branch = item_index.branch_for(document["relativePath"], branches)
         if branch and branch.get("table"):
-            tables.add(branch["table"])
-    return sorted(tables)
+            tables.setdefault(document["sha"], set()).add(branch["table"])
+    return tables
 
 
 def main():
@@ -90,6 +91,7 @@ def main():
     header_lines = forms.get("headerLines", 8)
     vocabulary = mask_text.vocabulary(list(texts.values()))
     splits = split_by_value(session_dir)
+    tables_of = tables_by_sha(session_dir)
 
     task_dir = session_dir / "form_templates"
     task_dir.mkdir(parents=True, exist_ok=True)
@@ -110,7 +112,7 @@ def main():
             skipped.append((form["id"], "nothing readable in any member"))
             continue
 
-        tables = tables_for(session_dir, members)
+        tables = sorted({table for sha in members for table in tables_of.get(sha, ())})
         if not tables:
             skipped.append((form["id"], "no branch covers any of its documents"))
             continue
