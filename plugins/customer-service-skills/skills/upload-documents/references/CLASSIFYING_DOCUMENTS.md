@@ -1,6 +1,6 @@
 # Classifying the documents
 
-How Step 7 turns a folder of extracted documents into one document template, a runner-up, a confidence and
+How Step 8 turns a folder of extracted documents into one document template, a runner-up, a confidence and
 a line of evidence per reading. `plan_batches.py` has already written the batch input files; this page is
 what to do with them.
 

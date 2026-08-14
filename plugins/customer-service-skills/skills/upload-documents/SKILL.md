@@ -128,7 +128,7 @@ substance, which is worse than no row at all.
 Send **one sub agent**, briefed per
 `${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/references/PREFLIGHT.md`, to settle its
 two questions: `uv`, which reads the documents in Step 5, and a Python with `openpyxl`, which writes the
-workbook in Step 8.
+workbook in Step 9.
 
 Either one missing stops the run, as that reference describes: tell the user which and what it blocks,
 then wait.
@@ -306,7 +306,44 @@ user.
 Done when `BATCHES.json` names at least one batch, every document in `DOCUMENTS.json` is either in a batch
 or on the reported exception list, and the user has seen that list.
 
-# Step 7 — classify, and reconcile
+# Step 7 — group the documents by form
+
+Most of a customer's folder is the same few pieces of paper filled in over and over. A **form** is that
+blank paper — a title, field labels, column headings — and grouping by it costs nothing but changes what
+the next step can be asked. Two copies of one form cannot come back as different types if the form is what
+gets named, and a form of a thousand documents that fits nothing in the app is one obvious question rather
+than a thousand quiet wrong answers. `docs/adr/0004` has the measurements.
+
+Three passes, all in `references/GROUPING_DOCUMENTS.md`:
+
+**Group.** One script over what Step 6 extracted, no agents:
+
+```sh
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/grouping/group_documents.py" ".workflow/active/${sessionId}"
+```
+
+It writes `FORMS.json`, and reports how many forms it found and how strongly their members joined. The two
+settings that decide that are recorded beside the answer, and `--sweep` shows what other settings would
+do. A folder under about forty documents is **skipped and says so** — go straight to Step 8.
+
+**Name.** `plan_naming.py`, then one sub agent per form carrying five members' *structure view*, then
+`collect_names.py` for the roll call. The agent is shown no document templates at all: naming a form is
+not choosing a type, and offering the app's list here is what turned a form the app had no word for into
+nine hundred `Questionnaire`s on the run this came from.
+
+**Confirm.** Build the review page, publish it, and give the user the link —
+`references/REVIEWING_BY_EYE.md`. They mark the documents that do not belong and say, per form, whether
+the grouping holds and whether the name fits. Read their paste back with `read_verdict.py`.
+
+There is no ground truth in a run: nobody knows which documents share a form until somebody looks. **So
+this confirmation is the only calibration the settings ever get, and it is not optional.** Where a form
+comes back failing, `apply_marks.py` turns the marks into wording rules the same script re-reads — or
+dissolves the form, and its documents are classified one at a time as they always were.
+
+Done when the user has seen the forms and confirmed them, `NAMED.json` holds a title and description for
+each, and whatever they rejected is either split by a rule or dissolved into `readOneAtATime`.
+
+# Step 8 — classify, and reconcile
 
 Each batch goes to one **`document-classifier`** sub agent — the agent this plugin ships, which carries the
 model and holds the tools down to `Read` and `Write` — and it says, per reading, the **id** of the document
@@ -355,7 +392,7 @@ Done when `CLASSIFICATIONS.json` holds one entry per batched document, every bat
 reported as unanswered, `REREAD.json` is empty or its round has been run, and the exception pile has been
 through the user.
 
-# Step 8 — show the workbook before building it
+# Step 9 — show the workbook before building it
 
 Load the `artifact-design` skill, then publish one **markdown** artifact to
 `.workflow/active/${sessionId}/tree.md` holding, in this order:
@@ -379,7 +416,7 @@ The sheet preview is what the user can judge, so fill it with real values rather
 Iterate: take their corrections, update `CLASSIFICATIONS.json`, republish to the same file path so the URL
 holds. Done when the user approves what the artifact shows.
 
-# Step 9 — write the workbook
+# Step 10 — write the workbook
 
 Build the Excel file per
 `${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/references/DOCUMENT_WORKBOOK_FORMAT.md`, writing it
@@ -397,7 +434,7 @@ Done when every file under the folder appears exactly once — a data sheet row,
 a `FILES_WITH_ISSUES` row — every identifier value traces back to a row in `ITEMS.csv`, and the file loads
 back with the row counts `CLASSIFICATIONS.json` predicted.
 
-# Step 10 — hand it over
+# Step 11 — hand it over
 
 Give the user the full path to `DOCUMENT_UPLOAD_WORKBOOK.xlsx` — it is in their own documents folder, so
 say that, since the last version of this skill left it somewhere they had to be shown. Then one line per

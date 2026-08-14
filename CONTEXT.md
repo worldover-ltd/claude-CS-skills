@@ -23,6 +23,20 @@ _Avoid_: upload, link, row
 One sub agent's classification of one document. The unit is `(sha, table)` — copies that share both
 share an answer, because they are picked from the same list of document templates.
 
+**Form**:
+The blank stationery a *document* is printed on — its title, field labels and column headings, never the
+values typed into them. Documents are grouped by form before anything is classified, and a form carries
+one title and one description of its own. A form is not a *document template*: it says what the paper is,
+not what the app calls it. Two suppliers' safety data sheets are two forms; one form used for two purposes
+is still one form.
+_Avoid_: group (a *section* is the app's group), cluster, layout, template
+
+**Structure view**:
+One document's text with everything its own *form* does not repeat blanked out, in the order it was read.
+What a naming sub agent is shown. Never compared to anything — comparison uses the signature, which is an
+unordered set of the same words.
+_Avoid_: masked text, skeleton
+
 ### What is being read against
 
 **Item**:

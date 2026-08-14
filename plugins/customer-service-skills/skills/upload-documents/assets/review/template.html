@@ -1,0 +1,400 @@
+<title>Forms to check</title>
+<style>
+  :root {
+    --slate-50: #f8fafc; --slate-100: #f1f5f9; --slate-200: #e2e8f0; --slate-300: #cbd5e1;
+    --slate-400: #94a3b8; --slate-500: #64748b; --slate-600: #475569; --slate-700: #334155;
+    --slate-800: #1e293b; --slate-900: #0f172a;
+    --blue-50: #eff6ff; --blue-600: #2563eb; --blue-700: #1d4ed8;
+    --red-200: #fecaca; --red-600: #dc2626; --emerald-600: #059669;
+    --white: #ffffff;
+    --radius-lg: 8px; --radius-md: 6px;
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+    --shadow-soft: 0 3px 8px 0 rgba(100, 116, 139, .16);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--slate-900); color: var(--slate-600);
+    font-family: var(--font-sans); font-size: 15px; line-height: 18.15px;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2 { font-weight: 500; margin: 0; color: var(--slate-900); text-wrap: balance; }
+  button { font: inherit; }
+
+  .shell { min-height: 100vh; display: flex; flex-direction: column; background: var(--slate-900); }
+  .chrome {
+    flex: 0 0 46px; display: flex; align-items: center; gap: 10px; padding: 0 20px;
+    color: var(--slate-400); font-size: 13px;
+  }
+  .chrome b { color: var(--slate-200); font-weight: 600; }
+  .surface {
+    flex: 1; min-height: 0; display: flex; flex-direction: column;
+    background: var(--white); border-top-left-radius: 16px; overflow: hidden;
+  }
+  .bar {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 12px 24px; background: var(--white); border-bottom: 1px solid var(--slate-200);
+  }
+  .tally {
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--slate-500);
+    font-variant-numeric: tabular-nums;
+  }
+  .tally b { color: var(--slate-900); font-weight: 600; }
+  .tally.some b { color: var(--red-600); }
+  .spacer { flex: 1; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px;
+    border-radius: var(--radius-md); font-size: 13.5px; font-weight: 500;
+    border: 1px solid var(--slate-200); background: var(--white); color: var(--slate-600);
+    cursor: pointer; transition: background-color 150ms, border-color 150ms, color 150ms;
+  }
+  .btn:hover { background: var(--slate-50); }
+  .btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--white), 0 0 0 4px var(--blue-600); }
+  .btn:active { position: relative; top: 1px; }
+  .btn-primary {
+    background: var(--blue-600); border-color: var(--blue-600); color: var(--white); font-weight: 600;
+  }
+  .btn-primary:hover { background: var(--blue-700); border-color: var(--blue-700); }
+
+  .content { flex: 1; min-height: 0; overflow-y: auto; }
+  .band { background: var(--slate-100); padding: 20px 24px; }
+  .band h1 { font-size: 24px; line-height: 29.05px; letter-spacing: -.01em; }
+  .band p { color: var(--slate-600); margin: 8px 0 0; max-width: 68ch; }
+  .todo {
+    max-width: 68ch; margin: 20px 24px 0; padding: 14px 18px; background: var(--blue-50);
+    border-left: 3px solid var(--blue-600); border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  }
+  .todo p { margin: 0; color: var(--slate-700); font-size: 14px; }
+  .todo p b { color: var(--slate-900); font-weight: 600; }
+  .todo p + p { margin-top: 8px; color: var(--slate-500); font-size: 13px; }
+
+  section { padding: 28px 24px 4px; }
+  section + section { border-top: 1px solid var(--slate-200); }
+  .head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .head h2 { font-size: 20px; line-height: 24.2px; }
+  .count {
+    display: inline-flex; padding: 2px 8px; border-radius: 9999px; background: var(--slate-100);
+    color: var(--slate-500); font-family: var(--font-mono); font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  .describes { margin: 8px 0 0; max-width: 78ch; font-size: 14px; color: var(--slate-600); }
+
+  .verdicts { display: flex; gap: 22px; flex-wrap: wrap; margin: 14px 0 0; }
+  .verdict { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--slate-500); }
+  .verdict span { font-weight: 500; color: var(--slate-700); }
+  .verdict label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+  .verdict input { accent-color: var(--blue-600); margin: 0; }
+
+  .blocklabel {
+    margin: 18px 0 0; font-size: 11px; font-weight: 600; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--slate-400);
+  }
+  .strip {
+    display: flex; gap: 14px; overflow-x: auto; overflow-y: hidden; padding: 12px 4px 20px;
+    scroll-snap-type: x proximity; scrollbar-width: thin; scrollbar-color: transparent transparent;
+  }
+  .strip:hover { scrollbar-color: rgba(100, 116, 139, .35) transparent; }
+  .strip::-webkit-scrollbar { height: 6px; }
+  .strip::-webkit-scrollbar-thumb { background-color: transparent; border-radius: 9999px; }
+  .strip:hover::-webkit-scrollbar-thumb { background-color: rgba(100, 116, 139, .35); }
+
+  .card {
+    position: relative; flex: 0 0 208px; scroll-snap-align: start; background: var(--white);
+    border: 1px solid var(--slate-200); border-radius: var(--radius-lg);
+    display: flex; flex-direction: column; margin-bottom: 4px; transition: box-shadow 150ms;
+  }
+  .card::after {
+    content: ""; position: absolute; left: 1px; right: 1px; bottom: -4px; height: 4px; z-index: -1;
+    background: linear-gradient(to bottom, rgba(203, 213, 225, .7), rgba(148, 163, 184, .35));
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  }
+  .card:hover { box-shadow: var(--shadow-soft); }
+  .card.marked { border-color: var(--red-200); background: #fef5f5; }
+  .card.marked img, .card.marked pre { opacity: .45; }
+  .card img {
+    width: 100%; height: 236px; object-fit: cover; object-position: top center;
+    background: var(--slate-100); cursor: zoom-in; display: block;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0; border-bottom: 1px solid var(--slate-100);
+  }
+  .card pre {
+    margin: 0; height: 236px; overflow: hidden; padding: 10px; cursor: zoom-in;
+    background: var(--slate-50); border-bottom: 1px solid var(--slate-100);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    font-family: var(--font-mono); font-size: 10px; line-height: 1.45; color: var(--slate-600);
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .file {
+    padding: 9px 10px; flex: 1; font-family: var(--font-mono); font-size: 11.5px;
+    word-break: break-all; line-height: 1.35; color: var(--slate-700);
+  }
+  .mark {
+    width: 100%; border: 0; border-top: 1px solid var(--slate-200); border-radius: 0 0 8px 8px;
+    padding: 8px 6px; font-size: 12.5px; color: var(--slate-500); background: transparent;
+    cursor: pointer;
+  }
+  .mark:hover { color: var(--red-600); background: #fdf1f0; }
+  .card.marked .mark { color: var(--red-600); font-weight: 600; }
+
+  dialog { border: 0; padding: 0; background: transparent; max-width: 96vw; max-height: 96vh; }
+  dialog::backdrop { background: rgba(15, 23, 42, .8); }
+  dialog img, dialog pre {
+    max-width: 92vw; max-height: 78vh; display: block; border-radius: 3px; background: var(--white);
+  }
+  dialog pre {
+    padding: 20px; overflow: auto; font-family: var(--font-mono); font-size: 13px;
+    color: var(--slate-700); white-space: pre-wrap;
+  }
+  .lightfoot {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px;
+    padding: 10px 12px; background: var(--white); border-radius: 3px;
+    font-family: var(--font-mono); font-size: 12px; color: var(--slate-500);
+  }
+  .lightfoot span { word-break: break-all; }
+
+  .out { margin: 26px 24px 60px; }
+  .out[hidden] { display: none; }
+  .out textarea {
+    width: 100%; min-height: 170px; resize: vertical; font-family: var(--font-mono); font-size: 12px;
+    line-height: 1.5; color: var(--slate-700); background: var(--slate-50);
+    border: 1px solid var(--slate-200); border-radius: var(--radius-md); padding: 10px;
+  }
+  .note { font-size: 13.5px; color: var(--slate-500); margin: 10px 0 0; }
+  .said { color: var(--emerald-600); font-weight: 600; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="shell">
+  <div class="chrome"><b>Worldover</b> <span>document upload</span></div>
+  <div class="surface">
+    <div class="bar">
+      <span class="tally" id="tally"><b id="bad">0</b> marked as not belonging</span>
+      <span class="spacer"></span>
+      <button class="btn" id="save">Save progress</button>
+      <button class="btn btn-primary" id="submit">Copy review</button>
+    </div>
+
+    <div class="content">
+      <div class="band">
+        <h1>Forms to check</h1>
+        <p id="lede"></p>
+      </div>
+
+      <div class="todo">
+        <p><b>Mark only the documents that do not belong with the others in their form.</b> Anything you
+        leave alone counts as being on the same form.</p>
+        <p>Then say, per form, whether the grouping holds and whether the name and description fit. The
+        first strip is a fair sample and is the one counted; the second is the least convincing members,
+        shown because that is where a mistake hides. Click a sample to see it full size.</p>
+      </div>
+
+      <main id="forms"></main>
+
+      <div class="out" id="out" hidden>
+        <textarea id="text" readonly></textarea>
+        <p class="note" id="note"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<dialog id="light">
+  <img id="lightimg" alt="" hidden>
+  <pre id="lighttext" hidden></pre>
+  <div class="lightfoot">
+    <span id="lightpath"></span>
+    <button class="btn" id="copypath">Copy path</button>
+    <button class="btn" id="close">Close</button>
+  </div>
+</dialog>
+
+<script id="payload" type="application/json">__DATA__</script>
+<script>
+  const data = JSON.parse(document.getElementById('payload').textContent);
+  const KEY = 'worldover-form-review';
+  const held = JSON.parse(localStorage.getItem(KEY) || '{}');
+  const marked = new Set(held.marked || []);
+  const verdicts = held.verdicts || {};
+
+  const keep = () => localStorage.setItem(
+    KEY, JSON.stringify({ marked: [...marked], verdicts }));
+
+  function card(sample) {
+    const node = document.createElement('article');
+    node.className = 'card' + (marked.has(sample.name) ? ' marked' : '');
+
+    let view;
+    if (sample.image) {
+      view = document.createElement('img');
+      view.src = 'data:image/jpeg;base64,' + sample.image;
+      view.alt = 'first page of ' + sample.name;
+    } else {
+      view = document.createElement('pre');
+      view.textContent = (sample.lines || []).join('\n');
+    }
+    view.addEventListener('click', () => enlarge(sample));
+
+    const file = document.createElement('div');
+    file.className = 'file';
+    file.textContent = sample.name;
+
+    const mark = document.createElement('button');
+    mark.className = 'mark';
+    const draw = () => {
+      const on = marked.has(sample.name);
+      node.classList.toggle('marked', on);
+      mark.textContent = on ? 'Marked — undo' : 'Not this form';
+      mark.setAttribute('aria-pressed', String(on));
+    };
+    mark.addEventListener('click', () => {
+      marked.has(sample.name) ? marked.delete(sample.name) : marked.add(sample.name);
+      keep(); draw(); tally();
+    });
+    draw();
+
+    node.append(view, file, mark);
+    return node;
+  }
+
+  function choice(form, axis, options) {
+    const wrap = document.createElement('div');
+    wrap.className = 'verdict';
+    const label = document.createElement('span');
+    label.textContent = axis === 'grouping' ? 'Grouping' : 'Name and description';
+    wrap.append(label);
+    for (const [value, text] of options) {
+      const option = document.createElement('label');
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = axis + '-' + form.formId;
+      input.checked = (verdicts[form.formId] || {})[axis] === value;
+      input.addEventListener('change', () => {
+        verdicts[form.formId] = Object.assign({}, verdicts[form.formId], { [axis]: value });
+        keep();
+      });
+      option.append(input, document.createTextNode(text));
+      wrap.append(option);
+    }
+    return wrap;
+  }
+
+  function build() {
+    document.getElementById('lede').textContent =
+      data.documents.toLocaleString() + ' documents were sorted into ' + data.forms.length +
+      ' forms by the wording printed on them, with everything typed in stripped out first. ' +
+      'Nobody read them to do this.';
+    const host = document.getElementById('forms');
+    for (const form of data.forms) {
+      const section = document.createElement('section');
+      section.innerHTML = '<div class="head"><h2></h2><span class="count"></span></div>' +
+                          '<p class="describes"></p>';
+      section.querySelector('h2').textContent = form.title;
+      section.querySelector('.count').textContent =
+        form.documents.toLocaleString() + (form.documents === 1 ? ' document' : ' documents');
+      section.querySelector('.describes').textContent = form.description;
+
+      const verdictRow = document.createElement('div');
+      verdictRow.className = 'verdicts';
+      verdictRow.append(
+        choice(form, 'grouping', [['ok', 'holds'], ['mixed', 'more than one form here']]),
+        choice(form, 'naming', [['ok', 'fits'], ['wrong', 'does not fit']]));
+      section.append(verdictRow);
+
+      for (const [block, caption] of [['random', 'A fair sample — this is the one counted'],
+                                      ['suspect', 'Least convincing members — not counted']]) {
+        const samples = form.samples.filter((s) => s.block === block);
+        if (!samples.length) continue;
+        const label = document.createElement('p');
+        label.className = 'blocklabel';
+        label.textContent = caption;
+        const strip = document.createElement('div');
+        strip.className = 'strip';
+        for (const sample of samples) strip.append(card(sample));
+        section.append(label, strip);
+      }
+      host.append(section);
+    }
+  }
+
+  const light = document.getElementById('light');
+  let showing = null;
+  function enlarge(sample) {
+    showing = sample;
+    const image = document.getElementById('lightimg');
+    const text = document.getElementById('lighttext');
+    image.hidden = !sample.image;
+    text.hidden = !!sample.image;
+    if (sample.image) image.src = 'data:image/jpeg;base64,' + sample.image;
+    else text.textContent = (sample.lines || []).join('\n');
+    document.getElementById('lightpath').textContent = sample.path || sample.name;
+    light.showModal();
+  }
+  document.getElementById('close').addEventListener('click', () => light.close());
+  document.getElementById('copypath').addEventListener('click', async () => {
+    if (showing) await navigator.clipboard.writeText(showing.path || showing.name);
+  });
+
+  function tally() {
+    document.getElementById('bad').textContent = marked.size;
+    document.getElementById('tally').classList.toggle('some', marked.size > 0);
+  }
+
+  function review() {
+    const forms = data.forms.map((form) => {
+      const mine = form.samples.filter((s) => marked.has(s.name));
+      const fair = form.samples.filter((s) => s.block === 'random' && marked.has(s.name));
+      return {
+        formId: form.formId,
+        grouping: (verdicts[form.formId] || {}).grouping || 'ok',
+        naming: (verdicts[form.formId] || {}).naming || 'ok',
+        randomShown: form.randomShown,
+        randomMarked: fair.length,
+        marked: mine.map((s) => s.name),
+      };
+    });
+    const prose = ['FORM REVIEW — ' + data.documents.toLocaleString() + ' documents in ' +
+                   data.forms.length + ' forms', ''];
+    for (const form of forms) {
+      if (!form.marked.length && form.grouping === 'ok' && form.naming === 'ok') continue;
+      const title = (data.forms.find((f) => f.formId === form.formId) || {}).title || form.formId;
+      prose.push(form.formId + ' (' + title + '): grouping ' + form.grouping +
+                 ', name ' + form.naming + ', ' + form.randomMarked + ' of ' +
+                 form.randomShown + ' fairly-chosen marked');
+      if (form.marked.length) prose.push('    not this form: ' + form.marked.join(' | '));
+    }
+    if (prose.length === 2) prose.push('Nothing marked, every form held.');
+    return prose.join('\n') + '\n\n```form-review\n' + JSON.stringify({ forms }) + '\n```';
+  }
+
+  document.getElementById('submit').addEventListener('click', async () => {
+    const text = review();
+    document.getElementById('out').hidden = false;
+    document.getElementById('text').value = text;
+    try {
+      await navigator.clipboard.writeText(text);
+      document.getElementById('note').innerHTML =
+        '<span class="said">Copied.</span> Paste all of it back into the conversation, including the ' +
+        'block at the end — that is the part the run reads.';
+    } catch {
+      document.getElementById('note').textContent =
+        'Could not reach the clipboard — select the text above and copy it by hand.';
+    }
+  });
+
+  document.getElementById('save').addEventListener('click', async () => {
+    const downloads = await (window.claude?.use?.('downloads') ?? null);
+    document.getElementById('out').hidden = false;
+    document.getElementById('text').value = review();
+    if (!downloads) {
+      document.getElementById('note').textContent =
+        'Saving to a file is not available here — your marks are kept in this browser instead.';
+      return;
+    }
+    await downloads.save({ filename: 'form-review.txt', data: review() });
+    document.getElementById('note').innerHTML = '<span class="said">Saved.</span>';
+  });
+
+  build();
+  tally();
+</script>
