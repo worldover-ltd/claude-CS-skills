@@ -112,7 +112,7 @@ Build and publish the page, then read the paste back. That is
 <interpreter> ".../lib/grouping/apply_marks.py" ".workflow/active/${sessionId}"
 ```
 
-Reads `REVIEW_RESULT.json` and writes `SPLIT_RULES.json`. Three outcomes per form:
+Reads `REVIEW_RESULT.json` and writes `SPLIT_RULES.json`. Four outcomes per form:
 
 - **Few marks, grouping held** — the form stands and the marked documents are taken out of it, into
   `readOneAtATime`.
@@ -120,6 +120,10 @@ Reads `REVIEW_RESULT.json` and writes `SPLIT_RULES.json`. Three outcomes per for
   `group_documents.py` again to apply it, then name and review the new forms.
 - **Failing, and nothing separates them** — the form **dissolves**. Every member goes to
   `readOneAtATime`, which is how this skill behaved before grouping existed.
+- **Split by value** — the person said these are the same paper and the app still calls them different
+  things. Not a failure and not repairable: no wording can separate them, because what separates them is
+  what was typed in. The form stands whole and its members are read one at a time, carrying whatever the
+  person said it splits into. See `docs/adr/0005`.
 
 Where the marks do not separate and the user can describe the difference in words, that description
 becomes wording in the rules file by hand. **It never becomes a change to the script.** The script is the
@@ -131,13 +135,32 @@ Dissolving always terminates, so the loop cannot spin. It is also the right answ
 sounds — the one genuinely contested form on the original folder had no separating wording at all, because
 the disagreement was about what to *call* it rather than which documents belonged.
 
+## Held up against the app's list
+
+```sh
+<interpreter> ".../lib/grouping/check_vocabulary.py" ".workflow/active/${sessionId}"
+```
+
+Every form's title against every document template the app has. Writes `VOCABULARY_GAP.json`, decides
+nothing, and reports the forms nothing fits with the number of documents behind each.
+
+This only works because the titles were written **before** any agent saw the app's list. A form named
+after seeing `Questionnaire` is called `Questionnaire`, its title matches, and the gap disappears — which
+is exactly the failure the step exists to catch. It is also why naming and classification stay two agents
+rather than one; see `docs/adr/0005`.
+
 ## What the classification step gets
 
-Each document carries its form's title and description into Step 8, and the classifier is asked whether
-they match what it is reading. `references/CLASSIFYING_DOCUMENTS.md` holds that half.
+**The form is what gets classified, not its documents.** One agent per form, given the form's own title
+and description and the app's list, and its answer covers every member — `docs/adr/0005` has the
+arithmetic. Four kinds of document are still read one at a time, and between them they are the whole of
+what a per-document batch now carries:
 
-Documents in `readOneAtATime`, and every document in a folder too small to group, carry no form and are
-classified exactly as they were before this step existed.
+- members of a form marked **split by value** — same paper, and the app calls them different things
+  because the difference was typed in;
+- documents in `readOneAtATime`, from a dissolved form or a mark on a form that otherwise held;
+- forms of one document, where per-form and per-document are the same thing;
+- every document in a folder too small to group, exactly as before this step existed.
 
 ## Files
 
@@ -149,4 +172,8 @@ classified exactly as they were before this step existed.
 | `named/f01.json` | one agent's answer |
 | `NAMED.json` | title and description per form, plus who did not answer and what was trimmed |
 | `REVIEW_RESULT.json` | the person's verdict per form, and the documents they marked |
-| `SPLIT_RULES.json` | the rules to apply, the forms that dissolved, and the documents to read alone |
+| `SPLIT_RULES.json` | the rules to apply, the forms that dissolved or split by value, and the documents to read alone |
+| `VOCABULARY_GAP.json` | which forms the app has a template for, which it does not, and how many documents ride on each |
+| `form_templates/f01.json` | one form-classification task: the form's name, its samples, and the app's list for its tables |
+| `FORM_CLASSIFICATION.json` | those tasks, and the forms deliberately not asked here |
+| `FORM_TEMPLATES.json` | the template each form turned out to be, and how many documents that answer stands for |

@@ -9,11 +9,16 @@ there is not.
 
 Everything travels **inside** the file, because a published page can reach nothing on this machine.
 
-Two blocks per form, and the difference between them is the point:
+Three blocks per form, and the difference between them is the point:
 
 - **random** — a fair sample. The only block a failure rate may be counted from.
 - **suspect** — the members that joined the form least convincingly. Good at finding mistakes, useless
   for measuring, because it is chosen to look wrong.
+- **filled** — the two ends of how much was *typed into* the form, which is the one thing `fit` cannot
+  see. Measured on the folder this came from: the form holding 45 specifications and 23 certificates of
+  analysis scored 0.795 and 0.806 on `fit`, so choosing by fit — either end of it — hands a person the
+  same mixture they would get at random. What separates those documents is a filled-in results column,
+  and this block is what puts a blank one beside a filled one.
 
 Mixing them is a real mistake and not an obvious one: a strip that puts the worst members first makes a
 good form look bad, and the better the choosing gets the worse every form scores.
@@ -23,12 +28,14 @@ import argparse
 import base64
 import io
 import json
+import re
 import sys
 from pathlib import Path
 
-RANDOM, SUSPECT = 8, 6
+RANDOM, SUSPECT, FILLED = 8, 6, 4
 WIDTH, QUALITY = 700, 66
 LINES = 14
+DIGITS = re.compile(r"\d")
 # A published page has a hard ceiling, and scans are most of what fills it.
 BUDGET_MB = 14.0
 
@@ -74,6 +81,28 @@ def thumbnail(path, width, quality):
     return base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
+def how_filled(record):
+    """How much of this document is digits, 0 to 1 — a stand-in for how much was typed into the form.
+
+    Crude on purpose. A form's printed words are the same on every copy, so what varies between a blank
+    sheet and a completed one is mostly numbers: results, lot numbers, dates, quantities. It does not
+    need to be right about any one document, only to sort the extremes far enough apart that the two
+    ends of the list are worth putting side by side.
+    """
+    best = ""
+    for field in ("textFile", "ocrTextFile"):
+        source = record.get(field)
+        if not source:
+            continue
+        try:
+            body = Path(source).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if len(body) > len(best):
+            best = body
+    return len(DIGITS.findall(best)) / len(best) if best else 0.0
+
+
 def spread(rows, count):
     """An even walk through a list, so a sample crosses the whole form rather than its first corner."""
     if count <= 0 or not rows:
@@ -94,6 +123,9 @@ def main():
     parser.add_argument("--suspect", type=int, default=SUSPECT,
                         help=f"least-convincing members shown per form, never counted "
                              f"(default: {SUSPECT})")
+    parser.add_argument("--filled", type=int, default=FILLED,
+                        help=f"members shown from both ends of how much was typed into the form, never "
+                             f"counted (default: {FILLED})")
     parser.add_argument("--width", type=int, default=WIDTH, help=f"thumbnail width (default: {WIDTH})")
     parser.add_argument("--seed", type=int, default=0, help="makes the random block the same twice")
     options = parser.parse_args()
@@ -122,8 +154,16 @@ def main():
         rest = [sha for sha in sorted(members, key=lambda s: fit.get(s, 1.0)) if sha not in fair]
         suspect = rest[:options.suspect]
 
+        # Both ends of how much was typed in, halved between them, skipping anything already shown.
+        taken = set(fair) | set(suspect)
+        by_fill = sorted((sha for sha in members if sha not in taken),
+                         key=lambda s: (how_filled(extracted.get((documents.get(s) or {}).get("path"))
+                                                   or {}), s))
+        half = max(1, options.filled // 2) if options.filled else 0
+        filled = (by_fill[:half] + by_fill[-half:])[:options.filled] if by_fill else []
+
         samples = []
-        for block, chosen in (("random", fair), ("suspect", suspect)):
+        for block, chosen in (("random", fair), ("suspect", suspect), ("filled", filled)):
             for sha in chosen:
                 document = documents.get(sha) or {}
                 record = extracted.get(document.get("path")) or {}
@@ -136,6 +176,7 @@ def main():
                     "name": document.get("name") or sha,
                     "path": (document.get("path") or "").replace("/", "\\"),
                     "fit": fit.get(sha, 1.0),
+                    "filled": round(how_filled(record), 4),
                     "image": picture,
                     "lines": None if picture else first_lines(record, LINES),
                 })
@@ -149,8 +190,9 @@ def main():
             "documents": len(members),
             "randomShown": len(fair),
             "suspectShown": len(suspect),
+            "filledShown": len(filled),
             # Said rather than left to subtraction: a sample that bounds coverage has to admit by how much.
-            "notShown": len(members) - len(fair) - len(suspect),
+            "notShown": len(members) - len(fair) - len(suspect) - len(filled),
             "samples": samples,
         })
 

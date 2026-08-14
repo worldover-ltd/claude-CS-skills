@@ -9,8 +9,17 @@ The page copies prose for the person and a fenced ```form-review block for this 
 would mean guessing, and a guess here silently changes which documents get read again — so the fence is
 required, and a paste without one is refused rather than interpreted.
 
-The failure rate is computed only from the **random** block. The suspect block is chosen to look wrong,
-so counting it would make a good form look bad and a better choosing algorithm look worse.
+The failure rate is computed only from the **random** block. The suspect and filled blocks are chosen to
+look wrong, so counting them would make a good form look bad and a better choosing algorithm look worse.
+
+Three answers about the grouping, not two, and the third is the one that is easy to miss:
+
+- `ok` — these are all the same form.
+- `mixed` — these are *not* all the same form. Something is here that does not belong, and the form is
+  repaired or dissolved.
+- `split` — they are all the same form, and the app still calls them different things, because what
+  separates them was typed into the sheet rather than printed on it. Nothing is wrong with the grouping
+  and nothing is dissolved; the form's documents are read one at a time instead of answered once.
 """
 
 import argparse
@@ -20,7 +29,7 @@ import sys
 from pathlib import Path
 
 FENCE = re.compile(r"```form-review\s*(.+?)```", re.DOTALL)
-VERDICTS = {"grouping": {"ok", "mixed"}, "naming": {"ok", "wrong"}}
+VERDICTS = {"grouping": {"ok", "mixed", "split"}, "naming": {"ok", "wrong"}}
 
 
 def main():
@@ -82,6 +91,9 @@ def main():
             "marked": marked,
             "markedShas": [names[form_id][name]["sha"] for name in marked],
             "notShown": strays,
+            # What the person said the form splits into, in their words. Data for this form only —
+            # never a rule the skill carries to the next customer. See ADR-0003.
+            "splitsInto": " ".join((answer.get("splitsInto") or "").split()) or None,
         })
 
     (session_dir / "REVIEW_RESULT.json").write_text(
@@ -93,6 +105,14 @@ def main():
         if form["marked"] or form["grouping"] != "ok" or form["naming"] != "ok":
             print(f"  {form['formId']}  grouping {form['grouping']}, name {form['naming']}, "
                   f"{form['randomMarked']}/{form['randomShown']} of the fair sample marked")
+    split = [f for f in out if f["grouping"] == "split"]
+    if split:
+        print(f"\nSPLIT BY VALUE ({len(split)}) — the form holds, and its documents are read one at a "
+              f"time rather than answered once:")
+        for form in split:
+            print(f"  {form['formId']}  {form['documents']} document(s)"
+                  + (f" — {form['splitsInto']}" if form["splitsInto"] else
+                     " — nothing was said about what it splits into, so the reading has no rule to go on"))
     if missing:
         print(f"\nNOT REVIEWED ({len(missing)}): {', '.join(missing)} — taken as holding.")
     print(f"\n-> {session_dir / 'REVIEW_RESULT.json'}")

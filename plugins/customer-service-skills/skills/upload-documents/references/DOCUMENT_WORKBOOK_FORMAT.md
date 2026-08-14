@@ -49,11 +49,11 @@ Then the data and lookup sheets:
   `raw_materials_documents`, `products_documents`. Several *item_template*s share one table and so share
   one sheet. The app agent reads this file against its own schema, so matching its table names is what
   saves it from guessing.
-- A `Document Templates` sheet with `name`, `id`, `table`, `item_template` and `section_id` — one row per
-  template **per *item_template* it appears under**, since the same template sits in a different section on
-  each. The `id` is the app's own `documentTemplates[].id`, copied, never derived.
-- A `Document Sections` sheet with `label`, `key`, `id`, `item_template`, `table` and `sort_order`, one row
-  per section that holds at least one template the workbook uses. The app's export carries no section id,
+- A `Document Templates` sheet with `name`, `id`, `table`, `item_template`, `section_id` and `is_new` —
+  one row per template **per *item_template* it appears under**, since the same template sits in a
+  different section on each. The `id` is the app's own `documentTemplates[].id`, copied, never derived.
+- A `Document Sections` sheet with `label`, `key`, `id`, `item_template`, `table`, `sort_order` and
+  `is_new`, one row per section that holds at least one template the workbook uses. The app's export carries no section id,
   so this is the one id the workbook derives: `ds_` followed by the first 12 hex characters of the SHA-256
   of `<item_template>:<key>`. The *item_template* is in the hash because the app scopes a section to one
   owner, so two *item_template*s with a "Safety" section have two sections rather than one shared. The
@@ -62,6 +62,21 @@ Then the data and lookup sheets:
   from 0.
 - Data starts at cell `A1` with the header row, values from row 2 down. No title banner, no merged cells,
   no blank spacer rows.
+
+### `is_new`, on both reference sheets
+
+`yes` where the app does not have this template or section yet and somebody must create it, `no` where it
+came from the export. Filled yellow for `yes`, green for `no` — the only colour anywhere in the workbook,
+and it earns the exception because these two sheets are the ones a person reads to decide what to build
+before the migration runs. On one real export, 68 of 82 template rows had no section, so most of what the
+section step returns is new; a sheet that does not say which is which is a sheet nobody can act on.
+
+Two things to get right, because both have already gone wrong once:
+
+- **openpyxl reads a fill back as `00FFC7CE`, not `FFFFC7CE`.** Compare on the last six hex digits or the
+  verification below fails against a file it has just written correctly.
+- **`is_new` is a column, not a formatting convention.** The colour is for the eye; the word is what any
+  later step reads. A run that writes only the fill has written nothing.
 
 ## Columns
 
@@ -180,6 +195,12 @@ has to unarchive if its documents are wanted.
 - Two rows carrying the same `file_sha` and the same `table` carry the same `document_template`. One
   reading covers every copy of one content on one table, so a difference here means the fan-out went
   wrong rather than that two classifiers disagreed.
+- Every `is_new` cell says `yes` or `no`, and every `yes` is filled yellow and every `no` green. Compare
+  fills on the last six hex digits — see above.
+- Two rows on the same `table` whose documents are printed on the same *form* carry the same
+  `document_template`, unless a person marked that form as splitting by value. That is ADR-0005's claim
+  written as a check: one answer stood for all of them, so a difference means the fan-out lost track of
+  which form a document belongs to.
 
 ## Human-readable finish
 
@@ -187,6 +208,10 @@ Apply to every sheet that has a header row — the data sheets, `IGNORED_FILES` 
 freeze the header row, bold it, turn on the autofilter, and set column widths to fit their content. This
 costs a few lines and is what makes the file usable by the person who has to check it. On the two file
 lists the autofilter is the whole point: it is how somebody reads one reason at a time.
+
+The `is_new` fills on the two reference sheets are the only colour in the workbook. Everything else stays
+unshaded on purpose: shading that means something is worth reading, and shading that is decoration
+teaches a reader to ignore both.
 
 ## Writing it
 

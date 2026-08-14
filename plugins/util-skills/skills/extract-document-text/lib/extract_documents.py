@@ -164,6 +164,8 @@ def record_for(path, relative_path, **known):
         "letters": 0,
         "charsRead": 0,
         "ocrChars": 0,
+        "ocrConfidence": None,
+        "ocrLines": 0,
         "pages": None,
         "pagesRendered": 0,
         "note": None,
@@ -290,9 +292,16 @@ def ocr_engine():
 
 
 def ocr_page(path):
-    """The lines RapidOCR read off one image, in the order it returned them."""
+    """([lines], [scores]) — what RapidOCR read off one image, in the order it returned them.
+
+    The score comes back per line and used to be dropped on the floor. It is the only thing that
+    separates a page read confidently from one read as confident nonsense; letters-per-page, which is
+    what decides `kind`, cannot tell those apart because it measures how much was read rather than how
+    well.
+    """
     result, _ = ocr_engine()(str(path))
-    return [text for _, text, _ in result or []]
+    lines = [(text, score) for _, text, score in result or []]
+    return [text for text, _ in lines], [score for _, score in lines if isinstance(score, (int, float))]
 
 
 def ocr_sources(record):
@@ -312,16 +321,17 @@ def ocr_record(record, out_dir, options):
     sources = ocr_sources(record)
     if not sources:
         return
-    lines = []
+    lines, scores = [], []
     for number, source in enumerate(sources, 1):
         try:
-            page = ocr_page(Path(source))
+            page, page_scores = ocr_page(Path(source))
         except Exception as error:  # every backend raises its own type
             note_that(record, f"OCR failed on page {number} ({type(error).__name__})")
             continue
         if page and len(sources) > 1:
             lines.append(f"\n## Page {number}\n")
         lines.extend(page)
+        scores.extend(page_scores)
 
     text = "\n".join(lines).strip()
     if not text:
@@ -332,9 +342,14 @@ def ocr_record(record, out_dir, options):
     path.write_text(capped, encoding="utf-8")
     record["ocrTextFile"] = str(path.resolve()).replace("\\", "/")
     record["ocrChars"] = len(capped.strip())
+    # Recorded, never routed on: no threshold has been measured, and `kind` is a contract other skills
+    # read. It is here so the question "which scans were read badly" can be asked with a number.
+    record["ocrConfidence"] = round(sum(scores) / len(scores), 3) if scores else None
+    record["ocrLines"] = len(scores)
     note_that(
         record,
         f"{record['ocrChars']} characters read by OCR"
+        + (f" at {record['ocrConfidence']:.2f} mean confidence" if record["ocrConfidence"] else "")
         + (f", {dropped} past the {options.max_chars} cap left out" if dropped else ""),
     )
 

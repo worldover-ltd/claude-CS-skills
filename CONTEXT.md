@@ -28,8 +28,15 @@ The blank stationery a *document* is printed on — its title, field labels and 
 values typed into them. Documents are grouped by form before anything is classified, and a form carries
 one title and one description of its own. A form is not a *document template*: it says what the paper is,
 not what the app calls it. Two suppliers' safety data sheets are two forms; one form used for two purposes
-is still one form.
+is still one form. A form names one *document template*, unless it is *split by value*.
 _Avoid_: group (a *section* is the app's group), cluster, layout, template
+
+**Split by value**:
+A *form* whose documents are not all the same *document template*, because what tells them apart is what
+was typed into the form rather than the form itself — a blank specification and the same sheet with its
+results filled in. Such a form is not wrong and does not dissolve: its documents are classified one at a
+time, while every other form is answered once.
+_Avoid_: mixed (that is a form holding documents printed on different stationery), contested, ambiguous
 
 **Structure view**:
 One document's text with everything its own *form* does not repeat blanked out, in the order it was read.
@@ -70,7 +77,9 @@ An answer naming something the app already has. A pick attaches on its own.
 
 **Proposal**:
 An answer naming something the app does not have, which a person must create before the document can
-land. Always the worse answer of the two.
+land. Worse than a *pick* only where the app's list holds the right *document template*: there a proposal
+is work somebody did not need to do. Where the list holds nothing that fits, a proposal is the only honest
+answer and a pick is a filing error — one that attaches silently, which a proposal never does.
 _Avoid_: invention, suggestion, new type
 
 **Exception**:

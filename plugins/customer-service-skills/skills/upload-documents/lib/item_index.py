@@ -190,6 +190,21 @@ class App:
             )
         return found[0], how, None
 
+    def duplicate_template_names(self):
+        """{name: [ids]} for every document template name the app holds more than once.
+
+        Not folded away, deliberately. Two records with one name can carry different sections, so
+        choosing between them decides where a document lands on the item's Documents tab — the user's
+        call, and the same kind of thing as an archived item or an identifier held twice.
+        """
+        by_name = {}
+        for template in self.document_templates.values():
+            by_name.setdefault(template["name"].casefold(), []).append(template)
+        return {
+            sorted(t["name"] for t in group)[0]: sorted(t["id"] for t in group)
+            for group in by_name.values() if len(group) > 1
+        }
+
     def counts(self):
         """Per table: items, archived, distinct identifiers, and the identifiers held by several items."""
         summary = {}

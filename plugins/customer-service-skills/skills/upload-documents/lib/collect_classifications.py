@@ -177,6 +177,43 @@ def settle(answered, given):
     return held_up[0], None, None, True
 
 
+def form_verdicts(session_dir, manifest, app):
+    """{readingId: verdict} for readings whose whole form was answered at once, or {} where none was.
+
+    The verdict carries `viaForm` and `standsFor` so nothing downstream can mistake this for a reading
+    of that document. It is an answer about the form, applied to a member of it.
+    """
+    path = session_dir / "FORM_TEMPLATES.json"
+    if not path.is_file():
+        return {}
+    answered = {f["formId"]: f for f in
+                (json.loads(path.read_text(encoding="utf-8")).get("forms") or [])}
+    out = {}
+    for entry in manifest.get("answeredByTheirForm") or []:
+        form = answered.get(entry.get("formId"))
+        if form is None:
+            continue
+        template_id = item_index.normalise(form.get("documentTemplateId")) or None
+        out[entry["readingId"]] = {
+            "unread": False,
+            "evidence": form.get("evidence") or None,
+            "quote": form.get("quote") or None,
+            "confidence": confidence_of(form.get("confidence")),
+            "runnerUp": item_index.normalise(form.get("runnerUpTemplateId")) or None,
+            "templateId": template_id,
+            "proposedTemplate": item_index.normalise(form.get("proposedTemplate")) or None,
+            "rounds": 1,
+            "agreed": False,
+            "contested": False,
+            "unverified": False,
+            "review": None,
+            "viaForm": entry["formId"],
+            "standsFor": form.get("documents"),
+            "sampled": form.get("sampled"),
+        }
+    return out
+
+
 def report(heading, rows):
     if not rows:
         return
@@ -219,9 +256,15 @@ def main():
         if quiet:
             silent.append((number, quiet))
 
+    # Readings their form answered come in whole, already checked by collect_form_templates.py against
+    # the list that form was offered and against the samples it was shown. They are marked so a row can
+    # say where its answer came from: five members of the form were read, and the rest are carried by
+    # the claim that they are the same stationery. See docs/adr/0005.
+    by_form = form_verdicts(session_dir, first_round, app)
+
     # Checked once per reading rather than once per copy: every copy of one content was answered by one
     # agent, so a fabricated answer is one fact about that reading, not a fact about forty files.
-    verdicts = {}
+    verdicts = dict(by_form)
     for reading_id, reading in readings.items():
         given = text_given_to(reading)
         answered = by_reading.get(reading_id) or []
@@ -293,6 +336,9 @@ def main():
             "evidence": verdict.get("evidence"),
             "quote": verdict.get("quote"),
             "review": verdict.get("review"),
+            # Empty for a document somebody's agent actually read, filled where the answer is the
+            # form's. A quote on such a row came off a sampled member, not off this file.
+            "viaForm": verdict.get("viaForm"),
         }
         relative_path = document["relativePath"]
 

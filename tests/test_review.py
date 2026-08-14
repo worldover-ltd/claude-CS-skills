@@ -18,6 +18,9 @@ GROUPING = SKILL / "lib/grouping"
 
 PLAIN = "SUPPLIER CHANGE FORM\nSupplier: {who}\nMaterial: {what}\n"
 WITH_REMOVAL = "SUPPLIER CHANGE FORM\nREMOVAL OF PACKAGING\nSupplier: {who}\nMaterial: {what}\n"
+# The same stationery with its results typed in: one form, and the app calls the two halves different
+# things. Nothing in the printed words separates them, which is the whole point of a value split.
+RESULTS = "\nRESULT 4.72 6.13 0.08 99.4 12.6 3.11 78.2 0.55 21.9 44.0\n"
 
 
 class Session:
@@ -63,10 +66,13 @@ class Session:
         return str(note)
 
 
-def verdict(marked, grouping="ok", naming="ok", shown=6):
-    return ("Some prose the person can read.\n\n```form-review\n" + json.dumps({"forms": [{
-        "formId": "f01", "grouping": grouping, "naming": naming,
-        "randomShown": shown, "randomMarked": len(marked), "marked": marked}]}) + "\n```\n")
+def verdict(marked, grouping="ok", naming="ok", shown=6, splits_into=None):
+    answer = {"formId": "f01", "grouping": grouping, "naming": naming,
+              "randomShown": shown, "randomMarked": len(marked), "marked": marked}
+    if splits_into:
+        answer["splitsInto"] = splits_into
+    return ("Some prose the person can read.\n\n```form-review\n"
+            + json.dumps({"forms": [answer]}) + "\n```\n")
 
 
 class ReviewPageTest(unittest.TestCase):
@@ -74,24 +80,37 @@ class ReviewPageTest(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.session = Session(self.directory.name, [
-            (f"sha{n:03d}", PLAIN.format(who=f"S{n}", what=f"M{n}")) for n in range(12)])
+            (f"sha{n:03d}", PLAIN.format(who=f"S{n}", what=f"M{n}") + (RESULTS if n % 2 else ""))
+            for n in range(12)])
 
-    def test_the_manifest_separates_a_random_block_from_a_suspect_one(self):
-        # Only the random block may be counted, because the suspect block is chosen to look wrong.
-        self.assertEqual(self.session.run(REVIEW, "build_review.py").returncode, 0)
+    def test_the_manifest_separates_a_random_block_from_the_chosen_ones(self):
+        # Only the random block may be counted; the other two are chosen to look wrong. Sizes are given
+        # here because no member is shown twice, so a form of twelve runs out under the defaults.
+        self.assertEqual(self.session.run(
+            REVIEW, "build_review.py", "--random", "4", "--suspect", "2", "--filled", "2").returncode, 0)
         form = self.session.read("REVIEW.json")["forms"][0]
         blocks = {sample["block"] for sample in form["samples"]}
-        self.assertEqual(blocks, {"random", "suspect"})
+        self.assertEqual(blocks, {"random", "suspect", "filled"})
         self.assertEqual(form["randomShown"],
                          sum(1 for s in form["samples"] if s["block"] == "random"))
 
     def test_what_the_sample_leaves_out_is_stated(self):
         # A sample bounds what anybody sees, and silence about that reads as "everything was checked".
-        self.session.run(REVIEW, "build_review.py", "--random", "3", "--suspect", "2")
+        self.session.run(REVIEW, "build_review.py", "--random", "3", "--suspect", "2", "--filled", "2")
         form = self.session.read("REVIEW.json")["forms"][0]
         self.assertEqual(form["randomShown"], 3)
         self.assertEqual(form["suspectShown"], 2)
-        self.assertEqual(form["notShown"], form["documents"] - 5)
+        self.assertEqual(form["filledShown"], 2)
+        self.assertEqual(form["notShown"], form["documents"] - 7)
+
+    def test_the_filled_block_puts_the_two_extremes_side_by_side(self):
+        # `fit` cannot see a value split — the words a filled-in sheet adds sit below the mask floor —
+        # so this block is chosen by how much was typed in instead, and shows both ends.
+        self.session.run(REVIEW, "build_review.py", "--random", "2", "--suspect", "0", "--filled", "2")
+        form = self.session.read("REVIEW.json")["forms"][0]
+        filled = [s for s in form["samples"] if s["block"] == "filled"]
+        self.assertEqual(len(filled), 2)
+        self.assertLess(min(s["filled"] for s in filled), max(s["filled"] for s in filled))
 
     def test_the_form_carries_its_name_to_the_page(self):
         self.session.run(REVIEW, "build_review.py")
@@ -177,6 +196,22 @@ class RepairTest(unittest.TestCase):
         self.assertEqual(outcome["rules"], [])
         self.assertIn("f01", outcome["dissolved"])
         self.assertEqual(len(outcome["readOneAtATime"]), 12)
+
+    def test_a_form_split_by_value_holds_and_is_read_one_document_at_a_time(self):
+        # Not a grouping mistake: the members are the same stationery, and what the app calls them
+        # differs by what was typed in. So no rule, no dissolve, and the form survives intact.
+        self.mark([], grouping="split", shown=12,
+                  splits_into="Product Specification where the results column is blank, "
+                              "Certificate of Analysis where it is filled")
+        result = self.session.run(GROUPING, "apply_marks.py")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        outcome = self.session.read("SPLIT_RULES.json")
+        self.assertEqual(outcome["rules"], [])
+        self.assertEqual(outcome["dissolved"], [])
+        self.assertEqual(outcome["readOneAtATime"], [])
+        self.assertEqual(outcome["splitByValue"][0]["form"], "f01")
+        self.assertEqual(outcome["splitByValue"][0]["documents"], 12)
+        self.assertIn("results column", outcome["splitByValue"][0]["splitsInto"])
 
     def test_a_form_with_few_marks_is_left_alone(self):
         self.mark(["sha001.pdf"], grouping="ok", shown=12)

@@ -87,6 +87,14 @@
   .verdict label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
   .verdict input { accent-color: var(--blue-600); margin: 0; }
 
+  .splitnote { margin: 10px 0 0; }
+  .splitnote textarea {
+    width: 100%; box-sizing: border-box; padding: 9px 11px; font: inherit; font-size: 13px;
+    color: var(--slate-700); background: var(--white); border: 1px solid var(--slate-300);
+    border-radius: 4px; resize: vertical;
+  }
+  .splitnote textarea:focus { outline: 2px solid var(--blue-600); outline-offset: -1px; }
+
   .blocklabel {
     margin: 18px 0 0; font-size: 11px; font-weight: 600; letter-spacing: .06em;
     text-transform: uppercase; color: var(--slate-400);
@@ -184,9 +192,13 @@
       <div class="todo">
         <p><b>Mark only the documents that do not belong with the others in their form.</b> Anything you
         leave alone counts as being on the same form.</p>
-        <p>Then say, per form, whether the grouping holds and whether the name and description fit. The
-        first strip is a fair sample and is the one counted; the second is the least convincing members,
-        shown because that is where a mistake hides. Click a sample to see it full size.</p>
+        <p>Then say, per form, whether the grouping holds and whether the name and description fit.
+        Three strips: a fair sample, which is the one counted; the least convincing members, where a
+        mistake hides; and the least and most filled in. Click a sample to see it full size.</p>
+        <p><b>Watch the last strip for one thing in particular:</b> documents printed on the same paper
+        that your app would call different things — a blank specification beside the same sheet with its
+        results filled in. That is not a grouping mistake, so mark the form <i>same paper, different
+        documents</i> rather than marking the documents, and say what tells them apart.</p>
       </div>
 
       <main id="forms"></main>
@@ -271,11 +283,37 @@
       input.checked = (verdicts[form.formId] || {})[axis] === value;
       input.addEventListener('change', () => {
         verdicts[form.formId] = Object.assign({}, verdicts[form.formId], { [axis]: value });
+        if (form._syncSplit) form._syncSplit();
         keep();
       });
       option.append(input, document.createTextNode(text));
       wrap.append(option);
     }
+    return wrap;
+  }
+
+  // Only asked once "same paper, different documents" is chosen, because until then there is nothing to
+  // describe. What goes in here reaches the reading as a rule for this form alone — never the next
+  // customer's.
+  function splitNote(form) {
+    const wrap = document.createElement('div');
+    wrap.className = 'splitnote';
+    const box = document.createElement('textarea');
+    box.rows = 2;
+    box.placeholder = 'What tells them apart? e.g. "Product Specification where the results column is ' +
+                      'blank, Certificate of Analysis where it is filled in"';
+    box.value = (verdicts[form.formId] || {}).splitsInto || '';
+    box.addEventListener('input', () => {
+      verdicts[form.formId] = Object.assign({}, verdicts[form.formId], { splitsInto: box.value });
+      keep();
+    });
+    wrap.append(box);
+    const sync = () => {
+      wrap.style.display = (verdicts[form.formId] || {}).grouping === 'split' ? 'block' : 'none';
+    };
+    wrap.addEventListener('sync', sync);
+    form._syncSplit = sync;
+    sync();
     return wrap;
   }
 
@@ -297,12 +335,16 @@
       const verdictRow = document.createElement('div');
       verdictRow.className = 'verdicts';
       verdictRow.append(
-        choice(form, 'grouping', [['ok', 'holds'], ['mixed', 'more than one form here']]),
+        choice(form, 'grouping', [['ok', 'holds'],
+                                  ['split', 'same paper, different documents'],
+                                  ['mixed', 'more than one form here']]),
         choice(form, 'naming', [['ok', 'fits'], ['wrong', 'does not fit']]));
       section.append(verdictRow);
+      section.append(splitNote(form));
 
       for (const [block, caption] of [['random', 'A fair sample — this is the one counted'],
-                                      ['suspect', 'Least convincing members — not counted']]) {
+                                      ['suspect', 'Least convincing members — not counted'],
+                                      ['filled', 'Least and most filled in — not counted']]) {
         const samples = form.samples.filter((s) => s.block === block);
         if (!samples.length) continue;
         const label = document.createElement('p');
@@ -351,6 +393,7 @@
         randomShown: form.randomShown,
         randomMarked: fair.length,
         marked: mine.map((s) => s.name),
+        splitsInto: (verdicts[form.formId] || {}).splitsInto || null,
       };
     });
     const prose = ['FORM REVIEW — ' + data.documents.toLocaleString() + ' documents in ' +
@@ -361,6 +404,7 @@
       prose.push(form.formId + ' (' + title + '): grouping ' + form.grouping +
                  ', name ' + form.naming + ', ' + form.randomMarked + ' of ' +
                  form.randomShown + ' fairly-chosen marked');
+      if (form.splitsInto) prose.push('    splits into: ' + form.splitsInto);
       if (form.marked.length) prose.push('    not this form: ' + form.marked.join(' | '));
     }
     if (prose.length === 2) prose.push('Nothing marked, every form held.');

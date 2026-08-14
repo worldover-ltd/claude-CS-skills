@@ -101,13 +101,22 @@ def main():
     forms = {form["id"]: form for form in group_documents.load(session_dir, "FORMS.json")["forms"]}
     texts, _ = group_documents.texts_by_sha(session_dir)
 
-    rules, dissolved, alone, renamed = [], [], [], []
+    rules, dissolved, alone, renamed, split = [], [], [], [], []
     for reviewed in result["forms"]:
         form = forms.get(reviewed["formId"])
         if form is None:
             continue
         if reviewed["naming"] == "wrong":
             renamed.append(reviewed["formId"])
+
+        # A form split by value is not a grouping mistake and there is nothing to repair. Its members
+        # are the same stationery; what the app calls them differs by what was typed in, which no
+        # wording rule can separate because the words that would do it are values. So the form stands
+        # and its documents are read one at a time — the one case where reading each is the right price.
+        if reviewed["grouping"] == "split":
+            split.append({"form": reviewed["formId"], "documents": len(form["members"]),
+                          "splitsInto": reviewed.get("splitsInto")})
+            continue
 
         marked = [sha for sha in reviewed["markedShas"] if sha in form["members"]]
         failing = reviewed["grouping"] == "mixed" or reviewed["failureRate"] >= options.fail
@@ -131,15 +140,20 @@ def main():
             alone.extend(form["members"])
 
     written = {"rules": rules, "dissolved": dissolved,
-               "readOneAtATime": sorted(set(alone)), "renameThese": renamed}
+               "readOneAtATime": sorted(set(alone)), "renameThese": renamed, "splitByValue": split}
     (session_dir / "SPLIT_RULES.json").write_text(json.dumps(written, indent=2), encoding="utf-8")
 
     print(f"{len(rules)} rule(s), {len(dissolved)} form(s) dissolved, "
+          f"{len(split)} form(s) split by value, "
           f"{len(written['readOneAtATime'])} document(s) to read one at a time")
     for rule in rules[:SAMPLE]:
         print(f"  {rule['form']} splits on {', '.join(rule['wording'])}")
     if dissolved:
         print(f"\nDISSOLVED — nothing in the wording separated what was marked: {', '.join(dissolved)}")
+    for form in split:
+        print(f"\nSPLIT BY VALUE — {form['form']} holds, and its {form['documents']} document(s) are read "
+              f"one at a time"
+              + (f", told: {form['splitsInto']}" if form["splitsInto"] else ""))
     if renamed:
         print(f"\nNAME REJECTED — these need naming again: {', '.join(renamed)}")
     if rules:

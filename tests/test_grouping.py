@@ -215,6 +215,17 @@ class GroupingTest(unittest.TestCase):
         self.assertGreater(len(after), before)
         self.assertTrue(any("threshold" in " ".join(f.get("splitBy") or []) for f in after))
 
+    def test_documents_with_nothing_to_read_are_counted_rather_than_passed_over(self):
+        # A scan nobody put through OCR leaves an empty text file, so it has no wording to group on and
+        # would drop out in silence — taking the saving with it, since a form's answer is what pays for
+        # the classification step.
+        texts = [a_supplier_document(n) for n in range(12)] + ["", "", ""]
+        session = Session(self.directory.name, texts)
+        result = session.group()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(session.forms()["nothingToRead"], 3)
+        self.assertIn("nothing readable", result.stdout)
+
     def test_the_sweep_reports_without_writing_forms(self):
         session = self.session()
         session.group()

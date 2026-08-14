@@ -1,8 +1,26 @@
 # Classifying the documents
 
-How Step 8 turns a folder of extracted documents into one document template, a runner-up, a confidence and
-a line of evidence per reading. `plan_batches.py` has already written the batch input files; this page is
-what to do with them.
+How Step 9 turns a folder of extracted documents into one document template, a runner-up, a confidence and
+a line of evidence. `plan_form_classification.py` and `plan_batches.py` have already written the input
+files; this page is what to do with them.
+
+## Two fan-outs, one prompt
+
+**Forms first.** Most documents are answered by the form they are printed on, one agent per form rather
+than one per document — 84 readings instead of 1,887 on the folder this came from. Those tasks come from
+`plan_form_classification.py`, and their answers are collected by `collect_form_templates.py`.
+
+**Then whatever the forms did not answer**: forms a person marked as splitting by value, forms that
+dissolved, singletons, and every document in a folder too small to group. Those come from
+`plan_batches.py` as before.
+
+The prompt below is written for a batch of documents. A form task carries the same fields with three
+differences — it holds one `title` and `description` for the whole form, its `samples` are structure
+views rather than paths to read, and the answer is one object rather than a list. Everything else is the
+same: pick from `vocabulary`, name a runner-up, score the margin, quote something you actually saw.
+
+**One answer covers every document on that form**, which is worth saying to the agent in as many words.
+It is the difference between reading five documents carefully and skimming five to describe a thousand.
 
 ## The shape of the fan-out
 
@@ -93,9 +111,13 @@ Substitute the batch's input path and its output path. Nothing else changes betw
 ```
 Read the JSON file at <batch input path>. It holds a `vocabulary` and a list of `documents`.
 
-Every document gets either a **pick** — something the app already has — or a **proposal**. Picking is
-always the better answer: a pick attaches on its own, a proposal is work for a person before this document
-can land. Propose only what you could not pick.
+Every document gets either a **pick** — something the app already has — or a **proposal**. Prefer a pick
+where one genuinely fits: it attaches on its own, where a proposal is work for a person first.
+
+But a pick that does not fit is worse than a proposal, not better. It attaches silently under a name that
+is wrong, and nothing downstream can tell it from a good one. If the closest thing on the list is not what
+this document is, say so with a proposal and name what it actually is. "Nearest available" is not an
+answer.
 
 For each document in that list:
 

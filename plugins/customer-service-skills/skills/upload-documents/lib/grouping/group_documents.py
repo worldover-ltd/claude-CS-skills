@@ -79,6 +79,18 @@ def texts_by_sha(session_dir):
     return texts, files
 
 
+def unreadable_shas(session_dir, texts):
+    """The documents grouping cannot see at all, because nothing readable came out of them.
+
+    Worth counting rather than passing over. A scan that was never put through OCR leaves an empty text
+    file, so it has no wording to group on and drops out silently — and since a form's answer is what
+    saves the classification step its money, a folder that is mostly unread scans quietly costs full
+    price. Measured on one real session: 2,149 of 2,433 records were `image-only` with empty text, and
+    grouping saw 256 documents out of 2,433 without saying so.
+    """
+    return {d["sha"] for d in load(session_dir, "DOCUMENTS.json") if d["sha"] not in texts}
+
+
 def overlap(left, right):
     return len(left & right) / len(left | right) if left | right else 0.0
 
@@ -200,9 +212,10 @@ def main():
 
     session_dir = options.session_dir
     texts, files = texts_by_sha(session_dir)
+    unread = unreadable_shas(session_dir, texts)
     written = {"floor": None, "threshold": options.threshold, "floorFraction": options.floor_fraction,
                "documents": len(texts), "files": files, "headerLines": options.header_lines,
-               "forms": [], "skipped": None}
+               "nothingToRead": len(unread), "forms": [], "skipped": None}
 
     if len(texts) < options.min_corpus:
         written["skipped"] = (f"too small to group: {len(texts)} document(s), and grouping needs at "
@@ -249,6 +262,10 @@ def main():
 
     print(f"{len(texts)} document(s) in {files} file(s) fall into {len(forms)} form(s), "
           f"at a floor of {floor} document(s) and a threshold of {options.threshold:.2f}\n")
+    if unread:
+        print(f"  {len(unread)} document(s) had nothing readable and are in no form. Each of those is")
+        print("  read on its own later, at full price. Scans need the extraction step's --ocr for this")
+        print("  step to see them at all.\n")
     print(f"{'form':>6s} {'documents':>10s} {'fit':>6s}  shared wording")
     for form in forms[:SAMPLE]:
         fit = sum(form["fit"].values()) / len(form["fit"])

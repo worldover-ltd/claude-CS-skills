@@ -24,20 +24,35 @@ Then publish `review.html` as an Artifact and give the person the link.
 it at several megabytes of base64. `render_review.py` is the only thing that writes it and nothing should
 read it.
 
-## The two blocks, and why they are not one
+## The three blocks, and why they are not one
 
-Each form shows samples in two labelled strips, and the distinction is load-bearing:
+Each form shows samples in three labelled strips, and the distinction is load-bearing:
 
 - **A fair sample** — chosen at random. The only block a failure rate is ever counted from.
-- **Least convincing members** — whatever joined the form on the thinnest overlap, shown first because
-  that is where a wrong grouping hides. Never counted.
+- **Least convincing members** — whatever joined the form on the thinnest overlap, shown because that is
+  where a wrong grouping hides. Never counted.
+- **Least and most filled in** — both ends of how much was *typed into* the form. Never counted.
 
-Mixing them is a real mistake and not an obvious one. A strip that front-loads the worst members makes a
-good form look bad, and the better the choosing algorithm gets at surfacing errors, the worse every form
-scores. `read_verdict.py` computes the rate from the fair block alone.
+The third block exists because `fit` cannot see a value split, and this was measured rather than assumed.
+On the form holding 45 Product Specifications and 23 Certificates of Analysis:
 
-Sizes are `--random` (8) and `--suspect` (6) per form. A published page holds about 16 MB and scans are
-what fill it, so `build_review.py` warns when the manifest gets close; lower the counts or `--width`.
+```
+Certificate of Analysis (CoA)   n= 23   fit mean=0.806
+Product Specification           n= 45   fit mean=0.795
+```
+
+Choosing by fit at either end returns the form's own 66/34 mixture — the two are one form precisely
+because the words marking a filled-in sheet fall below the mask floor. So this strip is chosen by digit
+density instead, which tracks what was typed rather than what was printed, and it puts a blank sheet
+beside a completed one.
+
+Mixing the blocks is a real mistake and not an obvious one. A strip that front-loads the worst members
+makes a good form look bad, and the better the choosing algorithm gets at surfacing errors, the worse
+every form scores. `read_verdict.py` computes the rate from the fair block alone.
+
+Sizes are `--random` (8), `--suspect` (6) and `--filled` (4) per form; no member is shown twice, so a
+small form runs out and simply shows fewer. A published page holds about 16 MB and scans are what fill it,
+so `build_review.py` warns when the manifest gets close; lower the counts or `--width`.
 
 ## What the person does
 
@@ -49,6 +64,18 @@ Two things, and the page asks for both:
 - **Give each form a verdict on two axes.** Does the *grouping* hold, and do the *title and description*
   fit. They are separate because a form can be perfectly grouped and badly named — and a bad name poisons
   the classification step, which uses the description as its check.
+
+The grouping axis takes **three** answers, and the middle one is easy to miss:
+
+| answer | means | what happens |
+| --- | --- | --- |
+| holds | all one form | the form is answered once, for all its members |
+| same paper, different documents | one form, and the app calls them different things | the form stands; its documents are read one at a time |
+| more than one form here | these are not all the same stationery | the form is repaired by a wording rule, or dissolves |
+
+Choosing the middle one opens a box for *what tells them apart*, in the person's own words — "Product
+Specification where the results column is blank, Certificate of Analysis where it is filled". That
+reaches the reading as data for that form alone and is never carried to another customer.
 
 ## Read the answer back
 

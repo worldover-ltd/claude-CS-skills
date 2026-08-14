@@ -117,8 +117,12 @@ so a caller can join on it. `textFile` and `images` are absolute, which is what 
 PDF is really text — a scan often leaks a handful of bullet glyphs, enough to pass a character count while
 holding no words. Both are counted on the **whole** conversion even under `--max-chars`, so a cap never
 changes what a file is judged to be; `charsRead` is what a reader is actually given, and `fullTextFile`
-points at the uncapped text where the two differ. `ocrTextFile` and `ocrChars` are filled under `--ocr`
-and empty otherwise. `pages` is filled for PDFs only; `note` carries anything
+points at the uncapped text where the two differ. `ocrTextFile`, `ocrChars`, `ocrConfidence` and
+`ocrLines` are filled under `--ocr` and empty otherwise — `ocrConfidence` being the mean of the
+recogniser's own per-line scores, which answers *how well* a page was read where `chars` and `letters`
+only answer *how much*. Nothing in this skill routes on it: it is recorded so a caller can ask which
+scans came back badly instead of guessing from length. `pages` is filled for PDFs only; `note` carries
+anything
 that qualifies the record, such as a page cap that was hit, a file whose bytes contradicted its name, a
 conversion LibreOffice made possible, or one that only the renderer rescued.
 

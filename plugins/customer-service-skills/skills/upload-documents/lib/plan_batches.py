@@ -200,6 +200,24 @@ def vocabulary_for(app, chunk):
     return {"documentTemplates": {table: app.templates_for(table) for table in sorted(tables)}}
 
 
+def form_answers(session_dir):
+    """{formId: answer} for every form already classified as a whole, or {} where none was."""
+    path = session_dir / "FORM_TEMPLATES.json"
+    if not path.is_file():
+        return {}
+    body = json.loads(path.read_text(encoding="utf-8"))
+    return {form["formId"]: form for form in body.get("forms") or []}
+
+
+def form_membership(session_dir):
+    """{sha: formId}, or {} where the folder was never grouped."""
+    path = session_dir / "FORMS.json"
+    if not path.is_file():
+        return {}
+    body = json.loads(path.read_text(encoding="utf-8"))
+    return {sha: form["id"] for form in body.get("forms") or [] for sha in form["members"]}
+
+
 def report(heading, rows):
     if not rows:
         return
@@ -326,6 +344,24 @@ def main():
         if not readings:
             raise SystemExit("none of the readings REREAD.json names survived this run's exceptions")
 
+    # Readings whose form has already been answered are not batched at all. That is the whole saving of
+    # classifying a form rather than its documents: on the folder this came from, sixteen answers stood
+    # for 1,819 readings, and only the one form a person marked as splitting by value was read document
+    # by document. See docs/adr/0005.
+    answered_forms = form_answers(session_dir)
+    form_of = form_membership(session_dir)
+    by_form = []
+    if answered_forms:
+        held = []
+        for reading in readings:
+            form_id = form_of.get(reading["sha"])
+            if form_id in answered_forms:
+                by_form.append({"readingId": reading["readingId"], "sha": reading["sha"],
+                                "table": reading["table"], "formId": form_id})
+            else:
+                held.append(reading)
+        readings = held
+
     ready.sort(key=lambda d: d["relativePath"])
     readings.sort(key=lambda r: (r["table"], sorted(r["files"])[0]))
     chunks = cut_into_batches(readings, max(1, options.batch_size), max(1, options.max_images))
@@ -361,7 +397,8 @@ def main():
     counts = {
         "files": len(ready),
         "readings": len(readings),
-        "readingsSaved": len(ready) - len(readings),
+        "readingsSaved": len(ready) - len(readings) - len(by_form),
+        "answeredByTheirForm": len(by_form),
         "batches": len(entries),
     }
     counts.update({kind: len(failed[kind]) for kind in EXCEPTIONS})
@@ -372,6 +409,7 @@ def main():
         "counts": counts,
         "documents": ready,
         "readings": readings,
+        "answeredByTheirForm": by_form,
         "batches": entries,
         "exceptions": {
             kind: [{"relativePath": p, "why": w} for p, w in failed[kind]] for kind in EXCEPTIONS
@@ -385,6 +423,9 @@ def main():
     )
     if counts["readingsSaved"]:
         print(f"  {counts['readingsSaved']} reading(s) saved by copies sharing content")
+    if by_form:
+        print(f"  {len(by_form)} reading(s) already answered by the form they are printed on, across "
+              f"{len({b['formId'] for b in by_form})} form(s) — not batched")
     if options.round == 1:
         for kind in EXCEPTIONS:
             report(HEADINGS[kind], failed[kind])

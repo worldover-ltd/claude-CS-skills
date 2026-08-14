@@ -76,6 +76,14 @@ def main():
             print("    a folder named by one of these resolves to no item, so it needs the user's call")
         print()
 
+    duplicates = app.duplicate_template_names()
+    if duplicates:
+        print(f"ONE NAME, SEVERAL TEMPLATES ({len(duplicates)}):")
+        for name, ids in duplicates.items():
+            print(f"  {name} — {len(ids)} records: {', '.join(ids)}")
+        print("  the app holds these twice, so a classifier is offered the same name more than once and")
+        print("  the two can sit in different sections. Merge them in the app, or say which one to use.\n")
+
     if app.problems:
         print(f"ROWS THE WORKFLOW DOES NOT EXPLAIN ({len(app.problems)}):")
         for problem in app.problems[:SAMPLE]:
