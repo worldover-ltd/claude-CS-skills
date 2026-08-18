@@ -18,6 +18,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import item_index
+import progress
 
 SAMPLE = 20
 CHUNK = 1 << 20
@@ -46,9 +47,14 @@ def main():
 
     excluded = item_index.excluded_paths(out_dir)
 
+    found = sorted(p for p in root.rglob("*") if p.is_file())
+
     documents, skipped, ours = [], 0, 0
-    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+    checking = progress.Pass(len(found), "document files", "Checked")
+    checking.start(f"Checking {len(found):,} document files in your folder.")
+    for path in found:
         relative = "/".join(path.relative_to(root).parts)
+        checking.advance()
         if item_index.is_our_own(relative):
             ours += 1
             continue
@@ -81,6 +87,10 @@ def main():
     for document in documents:
         by_sha[document["sha"]].append(document["relativePath"])
     copies = {sha: paths for sha, paths in by_sha.items() if len(paths) > 1}
+    checking.close(
+        f"Checked {len(found):,} document files in {checking.spent()} — "
+        f"{len(by_sha):,} different documents."
+    )
 
     print(f"{len(documents)} files, {len(by_sha)} distinct by content")
     if copies:
@@ -97,4 +107,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    progress.guard(main)

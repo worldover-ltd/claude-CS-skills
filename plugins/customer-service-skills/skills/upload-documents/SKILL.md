@@ -34,6 +34,24 @@ The user may be on macOS, Linux or Windows, and the shell differs with them. Wri
 forward slashes, quote any that could contain a space, and keep each command on a single line — a
 trailing backslash continues a line in `sh` and breaks it in PowerShell.
 
+
+**A long pass runs under `Monitor`.** Hashing, reading the documents and grouping them take minutes to
+hours, and a `Bash` call shows the user nothing until it exits. Run those with the `Monitor` tool instead,
+splitting the two streams: progress on stderr becomes the event stream, and the end-of-run report goes to
+a log to read afterwards.
+
+```
+Monitor({ command: "<the pass> 2>&1 1>>'.workflow/active/${sessionId}/logs/<pass>.log'",
+          description: "reading the documents", persistent: true })
+```
+
+`persistent: true`, because a cold read of a customer's folder outruns the one-hour ceiling. Every line the
+pass writes reaches the user as it happens, already in their own words — so relay nothing, and let a crash
+it could not catch arrive the same way, which is what keeps silence from reading as progress.
+
+That redirect is `sh` and stays `sh`: a `Monitor` command runs in the Bash environment rather than the
+user's own shell, so it is the one command in this skill that does not have to survive PowerShell.
+
 ### The export
 
 Nothing here reads the customer's app. Its own agent does that, through the
@@ -250,7 +268,8 @@ the count in the tree, and the legibility check has been re-read against the sma
 
 # Step 6 — hash, extract, and batch
 
-Three mechanical passes, in order. Each writes a file the next one reads.
+Three mechanical passes, in order. Each writes a file the next one reads, and the first two are long enough
+to run under `Monitor`, per **Session setup**.
 
 **Hash.** A document is carried into the workbook as its SHA-256, because that is what the upload screen
 matches on later — names collide between item folders and paths change, the hash does neither.
@@ -320,7 +339,7 @@ than a thousand quiet wrong answers. `docs/adr/0004` has the measurements.
 
 Three passes, all in `references/GROUPING_DOCUMENTS.md`:
 
-**Group.** One script over what Step 6 extracted, no agents:
+**Group.** One script over what Step 6 extracted, no agents, long enough to run under `Monitor`:
 
 ```sh
 <interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/grouping/group_documents.py" ".workflow/active/${sessionId}"

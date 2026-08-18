@@ -30,6 +30,11 @@ from pathlib import Path
 
 import mask_text
 
+# The one place a script here reaches outside its own directory: `progress` is shared with the passes in
+# the parent `lib/`, and a second copy would be a second place to change the cadence.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import progress  # noqa: E402
+
 SAMPLE = 8
 # Below this many documents there is no such thing as a word "most documents share", so grouping would
 # invent forms out of noise. Saying so beats returning a folder of singletons that looks like an answer.
@@ -95,7 +100,7 @@ def overlap(left, right):
     return len(left & right) / len(left | right) if left | right else 0.0
 
 
-def cluster(signatures, threshold):
+def cluster(signatures, threshold, reporting=None):
     """Documents gathered around the fullest copy of each form.
 
     Largest signature first, so a form takes shape around a complete copy of itself rather than around a
@@ -104,6 +109,8 @@ def cluster(signatures, threshold):
     """
     forms = []
     for sha in sorted(signatures, key=lambda s: (-len(signatures[s]), s)):
+        if reporting:
+            reporting.advance()
         signature = signatures[sha]
         best, score = None, 0.0
         for form in forms:
@@ -172,6 +179,11 @@ def sweep(texts, counted, options):
     """
     print("what the folder looks like at other settings:\n")
     print(f"{'floor':>8s} {'words':>7s} {'threshold':>10s} {'forms':>7s} {'largest':>8s} {'alone':>7s}")
+    trying = progress.Pass(len(SWEEP_FLOORS) * len(SWEEP_THRESHOLDS), "settings", "Tried")
+    trying.start(
+        f"Trying {len(SWEEP_FLOORS) * len(SWEEP_THRESHOLDS)} different settings over "
+        f"{len(texts):,} documents to see which groups them best."
+    )
     for fraction in SWEEP_FLOORS:
         floor = max(2, round(fraction * len(texts)))
         signatures = {sha: mask_text.signature(text, counted, floor, options.vocabulary)
@@ -179,10 +191,12 @@ def sweep(texts, counted, options):
         typical = sorted(len(s) for s in signatures.values())[len(signatures) // 2]
         for threshold in SWEEP_THRESHOLDS:
             forms = cluster(signatures, threshold)
+            trying.advance()
             largest = max((len(f["members"]) for f in forms), default=0)
             alone = sum(1 for f in forms if len(f["members"]) == 1)
             print(f"{fraction:8.3f} {typical:7d} {threshold:10.2f} {len(forms):7d} "
                   f"{largest:8d} {alone:7d}")
+    trying.close(f"Tried every setting in {trying.spent()}.")
     print("\nNothing was written. Pick a setting, run without --sweep, and let the review settle it.")
 
 
@@ -236,7 +250,10 @@ def main():
 
     signatures = {sha: mask_text.signature(text, counted, floor, options.vocabulary)
                   for sha, text in texts.items()}
-    forms = cluster(signatures, options.threshold)
+    sorting = progress.Pass(len(signatures), "documents", "Sorted")
+    sorting.start(f"Sorting {len(signatures):,} documents by the form they are printed on.")
+    forms = cluster(signatures, options.threshold, reporting=sorting)
+    sorting.close(f"Sorted {len(signatures):,} documents into {len(forms):,} forms in {sorting.spent()}.")
     forms.sort(key=lambda f: -len(f["members"]))
     for number, form in enumerate(forms, 1):
         form["id"] = f"f{number:02d}"
@@ -278,4 +295,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    progress.guard(main)

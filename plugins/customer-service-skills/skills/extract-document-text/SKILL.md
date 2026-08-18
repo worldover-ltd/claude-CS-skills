@@ -45,9 +45,10 @@ uv run "${CLAUDE_PLUGIN_ROOT}/skills/extract-document-text/lib/extract_documents
 `skills/` directory. Write paths with forward slashes, quote any that could contain a space, and keep the
 command on one line — a trailing backslash continues a line in `sh` and breaks it in PowerShell.
 
-It prints a progress line every 25 files, then a summary: the count per `kind`, and the file names under
-each heading that converted to something other than text. On a folder of thousands, the summary is the
-short read and the manifest holds the rest.
+It reports while it runs, on stderr: one line as a pass starts, one at most every thirty seconds after
+that, and one when it ends. The summary follows on stdout — the count per `kind`, and the file names
+under each heading that converted to something other than text. On a folder of thousands, the summary is
+the short read and the manifest holds the rest.
 
 Re-running reuses whatever is already in `<out_dir>/extracted/` — both the Markdown and any page already
 rendered — so a second pass at other flags only costs what it actually changes. `--force` redoes everything.
@@ -59,6 +60,17 @@ you need the answer. `--scans none` skips rendering, which trims the tail rather
 
 Rendering is **serialised**, because pdfium forbids concurrent calls from different threads even on different
 documents, so `--jobs` raises conversion throughput only.
+
+### What it says while it runs
+
+Those lines reach the person who asked for the run unaltered, so each one is a sentence they can act on:
+counts in the units they gave you, plain words for what is happening, and a time only once one has been
+measured. `docs/PRESENTING.md` in this plugin holds the vocabulary. A pass finishing inside thirty seconds
+costs two lines, and one that dies says so in one.
+
+They only reach anybody if the run is watching for them. A `Bash` call hands its output over when the
+process exits, which on a folder of thousands is half an hour later — so run this under the `Monitor`
+tool, whose command is the script itself, and each line arrives as it is written. `docs/adr/0006` is why.
 
 ### Input
 

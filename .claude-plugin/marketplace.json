@@ -12,16 +12,18 @@
     {
       "name": "customer-service-skills",
       "source": "./plugins/customer-service-skills",
-      "description": "Skills for the Customer Service team. Holds upload-documents, which builds the workbook that attaches a folder of documents onto items that already exist in a Worldmaker app, reading each document to decide what kind of document it is.",
+      "description": "Skills for the Customer Service team. Holds upload-documents, which builds the workbook that attaches a folder of documents onto items that already exist in a Worldmaker app, and extract-document-text, which turns those document files into Markdown and reads scanned pages with OCR so each one can be classified.",
       "category": "productivity",
-      "keywords": ["excel", "workbook", "migration", "upload", "documents"]
-    },
-    {
-      "name": "util-skills",
-      "source": "./plugins/util-skills",
-      "description": "Building blocks other skills call. Holds extract-document-text, which turns document files into Markdown an agent can read using MarkItDown under uv, renders the pages of scanned PDFs that hold no text, and converts legacy Office files where LibreOffice is installed.",
-      "category": "productivity",
-      "keywords": ["documents", "extraction", "markitdown", "uv", "pdf", "docx", "xlsx", "scans"]
+      "keywords": [
+        "excel",
+        "workbook",
+        "migration",
+        "upload",
+        "documents",
+        "extraction",
+        "markitdown",
+        "ocr"
+      ]
     }
   ]
 }

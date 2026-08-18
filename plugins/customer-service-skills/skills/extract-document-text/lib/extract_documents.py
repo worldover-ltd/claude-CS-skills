@@ -40,6 +40,8 @@ import threading
 import warnings
 from pathlib import Path
 
+import progress
+
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tif", ".tiff"}
 UNSUPPORTED_SUFFIXES = {".doc", ".rtf", ".odt", ".ods", ".odp", ".pages", ".numbers", ".key", ".7z", ".rar"}
 
@@ -72,6 +74,7 @@ OCR_INSTALL = f"uv run --with {OCR_PACKAGE} extract_documents.py <target> <out_d
 # What OCR is worth running over: a file whose text is a picture. `text` is left alone, because a text
 # layer the document itself carries beats a second guess at the same page.
 OCR_KINDS = {"image", "image-only", "sparse-text"}
+KEPT = "Everything read so far is kept, so re-running picks up where it stopped."
 
 # A page carrying fewer letters than this is a picture of a page rather than a page. Letters rather than
 # characters, because a scan often leaks a handful of bullet glyphs — enough to pass a character count
@@ -364,17 +367,29 @@ def read_by_ocr(records, out_dir, options):
     if not targets:
         print("\nnothing for OCR to read — no file came back as a picture")
         return
-    print(f"\n{len(targets)} file(s) to read by OCR")
+    # Counted in pages rather than files, because that is the work: one scan can be three pages and
+    # another one, and recognition is seconds a page where conversion is half a second a file.
+    total = sum(len(ocr_sources(record)) for record in targets)
+    reading = progress.Pass(total, "pages", "Read")
+    reading.start(
+        f"{len(targets):,} of them are scans, so I'm reading the pictures — "
+        f"{total:,} pages, and the slow part."
+    )
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, options.jobs)) as pool:
         futures = {pool.submit(ocr_record, r, out_dir, options): r for r in targets}
-        for done, future in enumerate(concurrent.futures.as_completed(futures), 1):
+        for future in concurrent.futures.as_completed(futures):
+            record = futures[future]
             try:
                 future.result()
             except Exception as error:  # a record that breaks OCR must not lose the whole run
-                note_that(futures[future], f"OCR failed ({type(error).__name__}: {error})")
-            if done % 25 == 0 or done == len(targets):
-                print(f"  {done}/{len(targets)} files")
-    print(f"  {sum(1 for r in targets if r['ocrTextFile'])} of {len(targets)} gave text")
+                note_that(record, f"OCR failed ({type(error).__name__}: {error})")
+            reading.advance(len(ocr_sources(record)))
+    blank = sum(1 for r in targets if not r["ocrTextFile"])
+    print(f"  {len(targets) - blank} of {len(targets)} gave text")
+    reading.close(
+        f"Went through {total:,} pages of scans in {reading.spent()}"
+        + (f"; {blank:,} of them came back with nothing on." if blank else ", and every one gave text.")
+    )
 
 
 def why_unsupported(suffix, options):
@@ -714,9 +729,11 @@ def main():
         print(f"{len(legacy)} legacy Office file(s) will not be converted: {where}")
 
     records = []
+    reading = progress.Pass(len(paths), "document files", "Read")
+    reading.start(f"Reading {len(paths):,} document files.")
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, options.jobs)) as pool:
         futures = {pool.submit(extract, p, root, extracted_dir, options, converted): p for p in paths}
-        for done, future in enumerate(concurrent.futures.as_completed(futures), 1):
+        for future in concurrent.futures.as_completed(futures):
             path = futures[future]
             try:
                 records.append(future.result())
@@ -724,8 +741,8 @@ def main():
                 records.append(record_for(
                     path, path.name, kind="failed", note=f"{type(error).__name__}: {error}"
                 ))
-            if done % 25 == 0 or done == len(paths):
-                print(f"  {done}/{len(paths)} files")
+            reading.advance()
+    reading.close(f"Read {len(paths):,} document files in {reading.spent()}.")
     if missing:
         print(f"  {len(missing)} listed path(s) are not on disk")
 
@@ -777,4 +794,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    progress.guard(main, KEPT)

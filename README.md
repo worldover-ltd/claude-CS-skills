@@ -8,7 +8,6 @@ document and compliance workflows.
 ```
 /plugin marketplace add worldover-ltd/claude-CS-skills
 /plugin install customer-service-skills
-/plugin install util-skills
 ```
 
 Then restart Claude Code (or reload plugins) when prompted.
@@ -17,8 +16,13 @@ Then restart Claude Code (or reload plugins) when prompted.
 
 ### `customer-service-skills`
 
-One skill, `upload-documents`, which builds the workbook a Worldmaker app agent migrates from —
-written in the app's own vocabulary, which you give it.
+Two skills. `upload-documents` builds the workbook a Worldmaker app agent migrates from, and
+`extract-document-text` reads the document files it has to classify.
+
+#### `upload-documents`
+
+Builds the workbook a Worldmaker app agent migrates from — written in the app's own vocabulary, which you
+give it.
 
 Attach a folder of documents onto items that **already exist** in the app. The items are there and the
 documents are a folder on your computer; this builds the workbook that links the two. The files themselves
@@ -27,9 +31,8 @@ are uploaded at the end, out of the migration.
 Invoke it by running `/upload-documents`, or ask Claude to "assign these documents to the items already
 in the app".
 
-Needs the `util-skills` plugin installed alongside it, since the skill calls `extract-document-text`. Then
-[`uv`](https://docs.astral.sh/uv/) to read the customer's documents and Python with `openpyxl` to write the
-workbook. It needs no repo access at all. Runs on macOS, Linux and Windows. Intermediate and output files
+Needs [`uv`](https://docs.astral.sh/uv/) to read the customer's documents and Python with `openpyxl` to
+write the workbook. It needs no repo access at all. Runs on macOS, Linux and Windows. Intermediate and output files
 are written under `.workflow/active/<sessionId>/` in your current working directory.
 
 Two more things live in `docs/`. `DOCUMENT_UPLOADING.md` is the Worldmaker stages that follow a run,
@@ -73,13 +76,10 @@ Then:
 Documents nothing could place are listed on the workbook's `README` sheet with the reason, rather than
 dropped.
 
-### `util-skills`
+#### `extract-document-text`
 
-Building blocks other skills call, rather than a job of their own. One skill so far,
-`extract-document-text`.
-
-It turns a pile of document files into Markdown an agent can read. Everything the other skills read goes
-through it — `upload-documents` for the documents it has to classify.
+Turns a pile of document files into Markdown an agent can read. `upload-documents` calls it for every
+document it has to classify, and it works standalone on any folder.
 
 Invoke it by running `/extract-document-text`, or ask Claude to "extract these documents".
 
@@ -114,9 +114,7 @@ plugins/
     docs/                                        # the upload journey, and how a run talks to you
     vendor/                                      # MIT copies of third-party skills, used as references
     skills/upload-documents/                     # SKILL.md + references/ + lib/
-  util-skills/
-    .claude-plugin/plugin.json
-    skills/extract-document-text/       # SKILL.md + lib/extract_documents.py
+    skills/extract-document-text/                # SKILL.md + lib/extract_documents.py
 ```
 
 ## License

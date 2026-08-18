@@ -92,3 +92,11 @@ A file somebody decided not to migrate, caught at the gate before anything was r
 workbook's `IGNORED_FILES` with the rule that caught it. An exclusion needs nobody — it is recorded so
 the totals add up and so a rule that caught more than intended is visible.
 _Avoid_: exception, filtered, dropped
+
+### How the work runs
+
+**Pass**:
+One mechanical script run inside a *step*, counted in a unit of its own and reporting how far along it
+is. A pass asks nobody anything and settles nothing a person must confirm — that is what separates it
+from a *step*, which has a "Done when" and usually a question in it.
+_Avoid_: phase, job, stage
