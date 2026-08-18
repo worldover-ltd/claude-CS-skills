@@ -157,7 +157,7 @@ def main():
     if renamed:
         print(f"\nNAME REJECTED — these need naming again: {', '.join(renamed)}")
     if rules:
-        print("\nRun group_documents.py again to apply the rules, then name and review the new forms.")
+        print("\nRun group_documents.py again to apply the rules, then name the new forms.")
     print(f"\n-> {session_dir / 'SPLIT_RULES.json'}")
 
 

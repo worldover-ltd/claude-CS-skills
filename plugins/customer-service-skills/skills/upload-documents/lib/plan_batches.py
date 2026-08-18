@@ -222,7 +222,8 @@ def split_rules(session_dir):
     """{formId: what the person said it splits into}, for forms read one document at a time.
 
     These documents are the hardest ones in the folder by definition — same stationery, and the app calls
-    them different things — so the one thing that helps is the sentence the person wrote at the review.
+    them different things — so the one thing that helps is the sentence somebody wrote in
+    `SPLIT_RULES.json`.
     It travels to the reading as data for that form alone and is never carried to another customer; see
     docs/adr/0003 on why named tie-break pairs were rejected.
     """

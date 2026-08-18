@@ -61,16 +61,16 @@ most likely to be rare.
   folder to 84 readings. The case this bullet was protecting — documents that share stationery exactly and
   differ only in what was typed in — is real, and ADR-0005 handles it as a declared exception rather than
   by paying for it everywhere.
-- **A wrong form is a systemic error**, so the person's confirmation is not optional. There is no ground
-  truth in a real run — nobody knows which documents share a form until somebody looks — so the review is
-  the only calibration the thresholds ever get.
+- **~~A wrong form is a systemic error, so the person's confirmation is not optional.~~** *Superseded by
+  ADR-0007.* The reasoning stands and the step does not: there is still no ground truth in a real run, so
+  the thresholds now run uncalibrated on every folder after the one they were measured on.
 - **The failure rate is counted from a fair sample only.** The page also shows the least convincing
   members, because that is where a mistake hides, but counting those would make a good form look bad and
   a better sampling algorithm look worse.
 - **Feedback is data, never code.** A person's marks become wording rules in `SPLIT_RULES.json` that the
   unchanged script reads. An agent editing the grouping script per customer is what the run this came out
   of actually did, and it removed every guard the pipeline had.
-- **A form names one document template**, unless a person marks it *split by value* — same stationery,
+- **A form names one document template**, unless it is marked *split by value* by hand — same stationery,
   different documents, because the difference was typed in. Such a form is not repaired and does not
   dissolve; its documents are read one at a time. See ADR-0005.
 - **Where no wording separates the marks, the form dissolves** and its documents are read one at a time,

@@ -35,8 +35,9 @@ a form whose members all turned out to be the same type. **They are a starting p
 ```
 
 There is no ground truth in a real run, so the sweep reports *shape* — how many forms, how big the largest
-is, how many documents end up alone — rather than accuracy. The review pass is what turns that into a
-judgement.
+is, how many documents end up alone — rather than accuracy. Nothing turns it into a judgement: the step
+that asked a person went with `docs/adr/0007`, so treat the defaults as the measurement and leave them
+where it put them.
 
 **A folder under about forty documents is skipped**, and `FORMS.json` says so in `skipped`. Read those one
 at a time; "a word most documents share" means nothing at that size.
@@ -101,23 +102,23 @@ and lists the forms to send again. The roll call is counted against `NAMING.json
 agent said it did. On the run this work came out of, six batches reported one fewer answer than they held
 and every one was complete.
 
-### Confirm — a person
+## Splitting a form by hand
 
-Build and publish the page, then read the paste back. That is
-`references/REVIEWING_BY_EYE.md`.
-
-## When the review says no
+A run no longer shows the forms to anybody — `docs/adr/0007` says why, and what that costs. Everything
+below still runs; nothing calls it. `references/REVIEWING_BY_EYE.md` and `lib/review/` describe the page
+that used to feed it, kept for the next thing this skill needs eyes on.
 
 ```sh
 <interpreter> ".../lib/grouping/apply_marks.py" ".workflow/active/${sessionId}"
 ```
 
-Reads `REVIEW_RESULT.json` and writes `SPLIT_RULES.json`. Four outcomes per form:
+Reads `REVIEW_RESULT.json` and writes `SPLIT_RULES.json`, which every later step still honours. Write
+either file by hand to reach one of four outcomes per form:
 
 - **Few marks, grouping held** — the form stands and the marked documents are taken out of it, into
   `readOneAtATime`.
 - **Failing, and the marks separate** — the wording that tells them apart becomes a rule. Run
-  `group_documents.py` again to apply it, then name and review the new forms.
+  `group_documents.py` again to apply it, then name the new forms.
 - **Failing, and nothing separates them** — the form **dissolves**. Every member goes to
   `readOneAtATime`, which is how this skill behaved before grouping existed.
 - **Split by value** — the person said these are the same paper and the app still calls them different
@@ -125,8 +126,8 @@ Reads `REVIEW_RESULT.json` and writes `SPLIT_RULES.json`. Four outcomes per form
   what was typed in. The form stands whole and its members are read one at a time, carrying whatever the
   person said it splits into. See `docs/adr/0005`.
 
-Where the marks do not separate and the user can describe the difference in words, that description
-becomes wording in the rules file by hand. **It never becomes a change to the script.** The script is the
+Where nothing separates them and somebody can describe the difference in words, that description becomes
+wording in the rules file by hand. **It never becomes a change to the script.** The script is the
 same script on every folder, which is what makes a form reproducible and lets you tell a customer *why*
 their documents were grouped the way they were. A pipeline that rewrites itself per customer is what the
 run this came out of actually did, and it silently removed every guard the pipeline had.

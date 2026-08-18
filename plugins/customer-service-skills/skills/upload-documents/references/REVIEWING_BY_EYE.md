@@ -1,8 +1,11 @@
 # Putting documents in front of a person
 
+**No step reaches this.** It confirmed the grouping until `docs/adr/0007` took that step out, and it is
+kept whole — this file, `lib/review/`, and `assets/review/` — for the next pile this skill needs eyes
+on. Read it when you are building that; a run does not.
+
 A published page that shows samples of each *form* and takes one judgement per document: does this belong
-with the others. Used to confirm the grouping before anything is classified, and reusable for any other
-pile this skill needs eyes on.
+with the others.
 
 The person is on the Customer Service team and is not a developer, so
 `${CLAUDE_PLUGIN_ROOT}/docs/PRESENTING.md` governs how this is put to them.

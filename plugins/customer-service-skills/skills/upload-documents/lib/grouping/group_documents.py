@@ -175,7 +175,8 @@ def sweep(texts, counted, options):
 
     There is no ground truth in a real run — nobody knows which documents share a form until somebody
     looks — so this reports shape rather than accuracy: how many forms each setting finds and how much
-    of the folder the largest one holds. The review step is what turns that into a judgement.
+    of the folder the largest one holds. Nothing turns that into a judgement any more; `docs/adr/0007`
+    is why.
     """
     print("what the folder looks like at other settings:\n")
     print(f"{'floor':>8s} {'words':>7s} {'threshold':>10s} {'forms':>7s} {'largest':>8s} {'alone':>7s}")
@@ -197,7 +198,7 @@ def sweep(texts, counted, options):
             print(f"{fraction:8.3f} {typical:7d} {threshold:10.2f} {len(forms):7d} "
                   f"{largest:8d} {alone:7d}")
     trying.close(f"Tried every setting in {trying.spent()}.")
-    print("\nNothing was written. Pick a setting, run without --sweep, and let the review settle it.")
+    print("\nNothing was written. Pick a setting and run without --sweep.")
 
 
 def main():

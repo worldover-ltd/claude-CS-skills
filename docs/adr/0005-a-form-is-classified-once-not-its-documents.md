@@ -52,9 +52,10 @@ The grouping cannot see the difference, and that is not a defect in it: the word
 sit below the mask floor, and their absence from the signature is exactly *why* these documents are one
 form. So the split cannot be detected by the same machinery that found the form.
 
-A person declares it, at the review, before anything is classified. They also say what it splits into, in
-their own words, and that reaches the reading as data for that form alone — never a rule the skill carries
-to the next customer. See ADR-0003 on why named tie-break pairs were rejected.
+It is declared by hand in `SPLIT_RULES.json`, before anything is classified, along with what it splits
+into in somebody's own words; that sentence reaches the reading as data for that form alone — never a
+rule the skill carries to the next customer. See ADR-0003 on why named tie-break pairs were rejected, and
+ADR-0007 on why nothing asks for it any more.
 
 ## Consequences
 
@@ -68,8 +69,9 @@ to the next customer. See ADR-0003 on why named tie-break pairs were rejected.
 - **The quote check is weaker for these rows, and this is the price.** Per document, a quotation is checked
   against what that document's reader was given. Per form, it is checked against the samples the form's
   agent was shown. What holds the other members is the grouping, not a reading.
-- **The review becomes load-bearing a third time.** It was already the only calibration the thresholds get
-  (ADR-0004) and the only control on anchoring; it is now also the only place a value split can be
-  declared. A run where nobody reviews is a run with no check on any of the three.
+- **~~The review becomes load-bearing a third time.~~** *Superseded by ADR-0007.* It was the only
+  calibration the thresholds get (ADR-0004), the only control on anchoring, and the only place a value
+  split could be declared — and it is gone, so a run has no check on any of the three. A value split is
+  now reached only by writing `SPLIT_RULES.json` by hand.
 - **Below the grouping floor nothing changes.** A folder too small to group is read one document at a time,
   exactly as before.
