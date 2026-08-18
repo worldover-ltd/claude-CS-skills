@@ -8,8 +8,8 @@ Three lines and one floor:
 
 - the **opener** goes out the moment the pass starts, carrying counts and no time, because nothing has
   been measured yet and an invented estimate is indistinguishable from a real one;
-- a **tick** one minute in, which is the first moment a rate exists to quote, and at most every ten
-  minutes after that;
+- a **tick** thirty seconds in, the first moment a rate exists to quote, another five minutes later
+  while the estimate is still settling, and one every fifteen minutes after that;
 - the **close**, always, so a pass that finished under the floor still costs exactly two lines.
 
 Progress goes to stderr and the end-of-run report stays on stdout, so the two can be read apart.
@@ -22,8 +22,11 @@ own, which reaches nothing outside this directory.
 import sys
 import time
 
-FIRST = 60.0
-FLOOR = 600.0
+# The waits before the first ticks, then the one every tick after them keeps to. Front-loaded because the
+# early updates are the ones carrying news - an estimate, then a corrected estimate - and the later ones
+# only say the pass is still alive.
+WAITS = (30.0, 300.0)
+FLOOR = 900.0
 
 
 class Pass:
@@ -34,18 +37,18 @@ class Pass:
     mentioning.
     """
 
-    def __init__(self, total, unit, verb, clock=time.monotonic, out=None, floor=FLOOR, first=FIRST):
+    def __init__(self, total, unit, verb, clock=time.monotonic, out=None, floor=FLOOR, waits=WAITS):
         self.total = total
         self.unit = unit
         self.verb = verb
         self.clock = clock
         self.out = sys.stderr if out is None else out
         self.floor = floor
-        self.first = first
+        self.waits = waits
         self.done = 0
         self.started = None
         self.spoke_at = None
-        self.ticked = False
+        self.ticks = 0
         # A Windows console defaults to a codepage that cannot print a customer's file names, and these
         # lines quote them.
         if hasattr(self.out, "reconfigure"):
@@ -58,11 +61,10 @@ class Pass:
     def advance(self, count=1):
         self.done += count
         now = self.clock()
-        # The first update comes early because it is the one carrying an estimate, and a person deciding
-        # whether to wait out a four-hour read should not spend ten minutes finding out how long it is.
-        if now - self.spoke_at < (self.floor if self.ticked else self.first):
+        wait = self.waits[self.ticks] if self.ticks < len(self.waits) else self.floor
+        if now - self.spoke_at < wait:
             return None
-        self.spoke_at, self.ticked = now, True
+        self.spoke_at, self.ticks = now, self.ticks + 1
         return self._say(self._tick(now))
 
     def close(self, line):

@@ -34,11 +34,11 @@ whether it is minutes or a model's guess.
 - **No time is quoted until one has been measured.** The opening line carries counts only. A published
   constant was available for conversion — half a second a file — and was rejected anyway: a person cannot
   tell a measured estimate from an invented one, and OCR has no constant at all.
-- **One line a minute in, then one per ten minutes, per pass, and the opener is exempt.** The first
-  update is early because it is the one carrying an estimate, and somebody deciding whether to wait out a
-  four-hour read should not spend ten minutes finding out how long it is. A pass that finishes before that
-  first update costs exactly two lines. The floor is per pass rather than per run, because a shared floor
-  means five processes coordinating through a file for nothing.
+- **The waits lengthen as the news thins: thirty seconds, five minutes, then every fifteen.** The early
+  updates carry an estimate and then a corrected one; the later ones only say the pass is still alive, and
+  each one costs the user a desktop notification. The opener is exempt, so a pass finishing inside the
+  first thirty seconds costs exactly two lines. The schedule is per pass rather than per run, because
+  sharing one would mean five processes coordinating through a file for nothing.
 - **Silence must never read as progress.** Everything the pass writes to stderr is the event stream — no
   filter to keep current — so a crash the top-level handler could not catch, an out-of-memory kill above
   all, arrives the same way the progress did.
