@@ -8,7 +8,8 @@ Three lines and one floor:
 
 - the **opener** goes out the moment the pass starts, carrying counts and no time, because nothing has
   been measured yet and an invented estimate is indistinguishable from a real one;
-- a **tick** at most every thirty seconds, carrying the rate the pass has actually achieved;
+- a **tick** one minute in, which is the first moment a rate exists to quote, and at most every ten
+  minutes after that;
 - the **close**, always, so a pass that finished under the floor still costs exactly two lines.
 
 Progress goes to stderr and the end-of-run report stays on stdout, so the two can be read apart.
@@ -17,7 +18,8 @@ Progress goes to stderr and the end-of-run report stays on stdout, so the two ca
 import sys
 import time
 
-FLOOR = 30.0
+FIRST = 60.0
+FLOOR = 600.0
 
 
 class Pass:
@@ -28,16 +30,18 @@ class Pass:
     mentioning.
     """
 
-    def __init__(self, total, unit, verb, clock=time.monotonic, out=None, floor=FLOOR):
+    def __init__(self, total, unit, verb, clock=time.monotonic, out=None, floor=FLOOR, first=FIRST):
         self.total = total
         self.unit = unit
         self.verb = verb
         self.clock = clock
         self.out = sys.stderr if out is None else out
         self.floor = floor
+        self.first = first
         self.done = 0
         self.started = None
         self.spoke_at = None
+        self.ticked = False
         # A Windows console defaults to a codepage that cannot print a customer's file names, and these
         # lines quote them.
         if hasattr(self.out, "reconfigure"):
@@ -50,9 +54,11 @@ class Pass:
     def advance(self, count=1):
         self.done += count
         now = self.clock()
-        if now - self.spoke_at < self.floor:
+        # The first update comes early because it is the one carrying an estimate, and a person deciding
+        # whether to wait out a four-hour read should not spend ten minutes finding out how long it is.
+        if now - self.spoke_at < (self.floor if self.ticked else self.first):
             return None
-        self.spoke_at = now
+        self.spoke_at, self.ticked = now, True
         return self._say(self._tick(now))
 
     def close(self, line):

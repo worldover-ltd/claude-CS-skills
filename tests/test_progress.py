@@ -46,32 +46,44 @@ class OpenerTest(unittest.TestCase):
 
 
 class FloorTest(unittest.TestCase):
-    def test_nothing_is_said_before_the_floor(self):
+    def test_nothing_is_said_in_the_first_minute(self):
         clock, out = FakeClock(), io.StringIO()
         run = a_pass(clock, out)
         run.start("Reading 1,000 document files.")
-        clock.wind(10)
+        clock.wind(45)
         self.assertIsNone(run.advance(400))
 
-    def test_a_tick_lands_on_the_floor(self):
+    def test_the_first_update_lands_a_minute_in(self):
         clock, out = FakeClock(), io.StringIO()
         run = a_pass(clock, out)
         run.start("Reading 1,000 document files.")
-        clock.wind(30)
-        self.assertEqual(run.advance(200), "Read 200 of 1,000 document files, about 2 minutes left.")
+        clock.wind(60)
+        self.assertEqual(run.advance(200), "Read 200 of 1,000 document files, about 4 minutes left.")
+
+    def test_the_first_update_comes_far_sooner_than_the_second(self):
+        """A minute to the estimate, ten minutes to everything after it."""
+        clock, out = FakeClock(), io.StringIO()
+        run = a_pass(clock, out)
+        run.start("Reading 1,000 document files.")
+        clock.wind(60)
+        self.assertIsNotNone(run.advance(100))
+        clock.wind(60)
+        self.assertIsNone(run.advance(100))
+        clock.wind(540)
+        self.assertIsNotNone(run.advance(100))
 
     def test_one_tick_per_window_however_often_it_is_advanced(self):
         clock, out = FakeClock(), io.StringIO()
         run = a_pass(clock, out)
         run.start("Reading 1,000 document files.")
-        clock.wind(30)
+        clock.wind(60)
         self.assertIsNotNone(run.advance(200))
-        clock.wind(15)
+        clock.wind(300)
         self.assertIsNone(run.advance(100))
-        clock.wind(15)
+        clock.wind(300)
         self.assertIsNotNone(run.advance(100))
 
-    def test_a_pass_under_the_floor_costs_an_opener_and_a_close(self):
+    def test_a_pass_shorter_than_the_first_update_costs_an_opener_and_a_close(self):
         clock, out = FakeClock(), io.StringIO()
         run = a_pass(clock, out, total=5)
         run.start("Reading 5 document files.")
@@ -88,34 +100,40 @@ class TimeTest(unittest.TestCase):
         clock, out = FakeClock(), io.StringIO()
         fast = a_pass(clock, out)
         fast.start("Reading 1,000 document files.")
-        clock.wind(30)
-        self.assertIn("about a minute left", fast.advance(300))
+        clock.wind(60)
+        self.assertIn("about 2 minutes left", fast.advance(400))
 
         clock, out = FakeClock(), io.StringIO()
         slow = a_pass(clock, out)
         slow.start("Reading 1,000 document files.")
-        clock.wind(30)
-        self.assertIn("about 8 minutes left", slow.advance(60))
+        clock.wind(60)
+        self.assertIn("about 16 minutes left", slow.advance(60))
 
     def test_the_last_stretch_claims_no_number(self):
         clock, out = FakeClock(), io.StringIO()
         run = a_pass(clock, out)
         run.start("Reading 1,000 document files.")
-        clock.wind(30)
+        clock.wind(60)
         self.assertIn("nearly done", run.advance(980))
+
+    def test_the_three_ways_of_saying_what_is_left(self):
+        self.assertEqual(progress.time_left(10, 1), "nearly done")
+        self.assertEqual(progress.time_left(60, 1), "about a minute left")
+        self.assertEqual(progress.time_left(600, 1), "about 10 minutes left")
+        self.assertIsNone(progress.time_left(600, 0))
 
     def test_a_pass_that_has_read_nothing_yet_claims_no_time(self):
         clock, out = FakeClock(), io.StringIO()
         run = a_pass(clock, out)
         run.start("Reading 1,000 document files.")
-        clock.wind(30)
+        clock.wind(60)
         self.assertEqual(run.advance(0), "Read 0 of 1,000 document files.")
 
     def test_counts_are_written_the_way_a_person_reads_them(self):
         clock, out = FakeClock(), io.StringIO()
         run = a_pass(clock, out, total=30922)
         run.start("Reading 30,922 document files.")
-        clock.wind(30)
+        clock.wind(60)
         self.assertIn("4,200 of 30,922", run.advance(4200))
 
 
