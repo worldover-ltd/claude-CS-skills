@@ -1,7 +1,8 @@
 # Document upload
 
-The language of `upload-documents`: taking a customer's folder of files and producing a workbook that
-attaches them onto items that already exist in their Worldmaker app.
+The language of this plugin's skills: taking a customer's folder of files and producing a workbook that
+attaches them onto items that already exist in their Worldmaker app (`upload-documents`), and guiding a
+person through the wider journey that workbook belongs to (`ask-worldover`).
 
 ## Language
 
@@ -95,8 +96,25 @@ _Avoid_: exception, filtered, dropped
 
 ### How the work runs
 
+**Step**:
+One numbered unit of work in a skill or a guide, with a "Done when" and usually a question in it. The
+same word covers both sides: a step of a run, and a step the person takes on their own screen.
+_Avoid_: phase, stage, part
+
 **Pass**:
 One mechanical script run inside a *step*, counted in a unit of its own and reporting how far along it
 is. A pass asks nobody anything and settles nothing a person must confirm — that is what separates it
 from a *step*, which has a "Done when" and usually a question in it.
 _Avoid_: phase, job, stage
+
+**Journey**:
+Everything between a customer's raw files and their data live in Production, across as many *steps*,
+screens and machines as it takes. A *step* belongs to one journey; a run covers part of one.
+_Avoid_: flow, process, pipeline
+
+**`{WORLDMAKER}`** and **`{LOCAL}`**:
+The two agents `ask-worldover` runs as, and the tokens its docs use to mark which one a *step* is
+addressed to. `{WORLDMAKER}` is the chat inside the customer's app, which reads the app's data and
+publishes cards. `{LOCAL}` is Claude Code on the user's own machine, which reads their files and builds
+the workbook. Neither can do the other's half, and this plugin is `{LOCAL}`.
+_Avoid_: side, environment (an *environment* is Development, Staging or Production)
