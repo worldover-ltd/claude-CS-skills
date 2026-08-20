@@ -12,7 +12,7 @@
     {
       "name": "customer-service-skills",
       "source": "./plugins/customer-service-skills",
-      "description": "Skills for the Customer Service team. Holds upload-documents, which builds the workbook that attaches a folder of documents onto items that already exist in a Worldmaker app, and extract-document-text, which turns those document files into Markdown and reads scanned pages with OCR so each one can be classified.",
+      "description": "Skills for the Customer Service team. Holds upload-documents, which builds the workbook that attaches a folder of documents onto items that already exist in a Worldmaker app; extract-document-text, which turns those document files into Markdown and reads scanned pages with OCR so each one can be classified; and ask-worldover, which answers what to do next at any point in that journey.",
       "category": "productivity",
       "keywords": [
         "excel",
@@ -22,7 +22,9 @@
         "documents",
         "extraction",
         "markitdown",
-        "ocr"
+        "ocr",
+        "guide",
+        "help"
       ]
     }
   ]

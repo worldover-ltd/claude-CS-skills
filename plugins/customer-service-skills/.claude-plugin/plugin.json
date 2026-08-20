@@ -1,7 +1,7 @@
 {
   "name": "customer-service-skills",
-  "version": "0.10.0",
-  "description": "Skills for the Customer Service team. Holds upload-documents, which builds the workbook that attaches a folder of documents onto items that already exist in a Worldmaker app, reading each document to decide what kind of document it is, and extract-document-text, which converts those document files to Markdown under uv, renders the pages of scanned PDFs that hold no text, and reads those pages with OCR on request.",
+  "version": "0.11.0",
+  "description": "Skills for the Customer Service team. Holds upload-documents, which builds the workbook that attaches a folder of documents onto items that already exist in a Worldmaker app, reading each document to decide what kind of document it is; extract-document-text, which converts those document files to Markdown under uv, renders the pages of scanned PDFs that hold no text, and reads those pages with OCR on request; and ask-worldover, which guides a person through getting a customer's data and documents into their Worldmaker app and says which screen and control to use at each step.",
   "author": {
     "name": "Frederico Correia",
     "email": "frederico.correia@worldover.io"
@@ -18,6 +18,8 @@
     "uv",
     "pdf",
     "scans",
-    "ocr"
+    "ocr",
+    "guide",
+    "help"
   ]
 }

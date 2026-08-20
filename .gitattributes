@@ -1,0 +1,4 @@
+# The published copy of ask-worldover must stay byte-identical to its worldmaker source,
+# which pins LF. Without this, a checkout here rewrites it to CRLF and the publish check
+# reports every line as changed.
+plugins/customer-service-skills/skills/ask-worldover/** text eol=lf

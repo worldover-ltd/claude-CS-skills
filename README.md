@@ -16,8 +16,9 @@ Then restart Claude Code (or reload plugins) when prompted.
 
 ### `customer-service-skills`
 
-Two skills. `upload-documents` builds the workbook a Worldmaker app agent migrates from, and
-`extract-document-text` reads the document files it has to classify.
+Three skills. `upload-documents` builds the workbook a Worldmaker app agent migrates from,
+`extract-document-text` reads the document files it has to classify, and `ask-worldover` answers the
+question of what to do next.
 
 #### `upload-documents`
 
@@ -104,6 +105,23 @@ its content ended up.
 It is a tool rather than a procedure: it converts what it is given and reports what it did, and what to do
 with the result is the caller's.
 
+#### `ask-worldover`
+
+Answers "how do I do this?" and "what happens next?" for getting a customer's data and documents into
+their Worldmaker app — migrations, document uploads, and what to do when one of them fails.
+
+Invoke it by running `/ask-worldover`, or ask Claude how a migration works or what to do next.
+
+It answers in **click-paths**: the screen, then the exact control, then what happens. Where a step is not
+one this machine can take, it says where the step happens and hands over rather than pretending. It reads
+documentation and asks questions; it changes nothing.
+
+The guides live in `skills/ask-worldover/docs/` — one for each side of the journey, since half of it
+happens in the Worldmaker web app and half on your own machine. They are published from Worldmaker's own
+repository rather than written here, so a correction belongs upstream:
+[ADR-0008](docs/adr/0008-ask-worldover-is-published-here-not-written-here.md) records why, and what that
+costs.
+
 ## Repo layout
 
 ```
@@ -115,6 +133,7 @@ plugins/
     vendor/                                      # MIT copies of third-party skills, used as references
     skills/upload-documents/                     # SKILL.md + references/ + lib/
     skills/extract-document-text/                # SKILL.md + lib/extract_documents.py
+    skills/ask-worldover/                        # SKILL.md + docs/ (published from Worldmaker)
 ```
 
 ## License
