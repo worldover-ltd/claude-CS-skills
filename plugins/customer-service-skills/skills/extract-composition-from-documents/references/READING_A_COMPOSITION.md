@@ -93,6 +93,13 @@ heading and the cell beside it still passes — the words are the document's, on
 agent's. An invented line passes none of them, and neither does one an agent has joined with `...`,
 which is why the brief tells it to quote a single line even where the table is printed on its side.
 
+The tiers are generous about *shape* and strict about *order*, which is the line worth holding. A
+converter that ran a cell together as `Ingredientsdeterminednottobehazardous,including` is forgiven the
+moment the agent puts the spaces back — that is the `spacing` tier, and refusing it would block good
+readings over the converter's own damage. Lifting the `water` from the line below up into the middle of
+that row is not forgiven, because the result is a sentence that reads better than anything the document
+printed, and a check that cannot tell those apart is checking nothing.
+
 **The whole material is blocked, not the offending row.** A composition with one row quietly dropped
 still looks like a composition, and still sums close enough to 100 that nobody asks.
 

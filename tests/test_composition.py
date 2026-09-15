@@ -327,6 +327,66 @@ class VerificationTest(unittest.TestCase):
                          "when somebody wants to see it")
 
 
+class DateLabelTest(unittest.TestCase):
+    """The label a date carries, on a page the converter ran together."""
+
+    def setUp(self):
+        sys.path.insert(0, str(LIB))
+        import dates
+        self.dates = dates
+
+    def labels(self, text):
+        return [(entry["label"], entry["kind"]) for entry in self.dates.find(text)]
+
+    def test_a_label_the_converter_ran_together_keeps_its_name(self):
+        self.assertEqual(self.labels("ProductName:LACTANOLNSF4\nIssueDate:17/08/2020"),
+                         [("IssueDate", "issue")],
+                         "the bare `issued` sitting inside `IssueDate` must not win the label")
+
+    def test_a_spaced_label_is_unchanged(self):
+        self.assertEqual(self.labels("Issue Date: 14/03/2023"), [("Issue Date", "issue")])
+
+    def test_the_nearest_label_still_wins(self):
+        self.assertEqual(self.labels("Version No: 6.1  Print Date: 02/09/2024"),
+                         [("Print Date", "print")])
+
+
+class QuoteTest(unittest.TestCase):
+    """What a quotation may be forgiven, and what it may not.
+
+    A converter mangles a table: it drops the spaces out of a cell and drops one cell onto the line
+    below its own row. An agent that puts the spaces back has quoted the document; one that lifts the
+    stray cell up into the middle of the line has written a sentence the document does not contain.
+    """
+
+    MANGLED = ("Ingredients\n"
+               "Name CAS Proportion\n"
+               "Ethanol 64-17-5 95-100%\n"
+               "Ingredientsdeterminednottobehazardous,including Balance\n"
+               "water\n")
+
+    def setUp(self):
+        sys.path.insert(0, str(LIB))
+        import verbatim
+        self.verbatim = verbatim
+        self.forms = verbatim.forms(self.MANGLED)
+
+    def check(self, quote):
+        return self.verbatim.check(quote, self.forms)
+
+    def test_the_line_as_the_converter_left_it_is_exact(self):
+        self.assertEqual(self.check("Ingredientsdeterminednottobehazardous,including Balance"), "exact")
+
+    def test_putting_the_spaces_back_is_forgiven(self):
+        self.assertEqual(
+            self.check("Ingredients determined not to be hazardous, including Balance"), "spacing")
+
+    def test_reflowing_the_row_into_a_readable_sentence_is_not(self):
+        self.assertEqual(
+            self.check("Ingredients determined not to be hazardous, including water Balance"), "ABSENT",
+            "moving a cell up into the line reads better and is no longer what the document printed")
+
+
 class NoCandidateTest(unittest.TestCase):
     """A material whose folder holds nothing composition-shaped still has to reach the user by name."""
 

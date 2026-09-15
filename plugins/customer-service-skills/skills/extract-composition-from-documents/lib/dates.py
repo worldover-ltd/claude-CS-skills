@@ -40,10 +40,14 @@ DATE = re.compile(rf"({NUMERIC}|{WORDED})", re.I)
 # The words that precede a date and say what kind of date it is. Ordered longest first so that
 # "date of revision" is not read as the bare "date" sitting inside it, and matched nearest-first below:
 # `Version No: 6.1  Issue Date: 29/11/2021` holds two labels, and the date belongs to the closer one.
+# The spaces are `\s*` rather than literal, because converting a PDF to text strips them: a page printing
+# `Issue Date: 7/06/2021` reaches this as `IssueDate:7/06/2021`, where a literal space would fall through
+# to the bare `issued` sitting inside `IssueDate` and label the date `IssueD`.
 LABEL = re.compile(
-    r"(date of issue|date of revision|revision date|review date|issue date|print date|printing date|"
-    r"version date|preparation date|prepared on|valid since|valid from|supersedes|superseded|"
-    r"last rev\.?|last revised|revised|revision|edition|version|issued|effective|date)"
+    r"(date\s*of\s*issue|date\s*of\s*revision|revision\s*date|review\s*date|issue\s*date|"
+    r"print\s*date|printing\s*date|version\s*date|preparation\s*date|prepared\s*on|"
+    r"valid\s*since|valid\s*from|supersedes|superseded|last\s*rev\.?|last\s*revised|"
+    r"revised|revision|edition|version|issued|effective|date)"
     r"(?=\s*[:\-]?\s*[^\n]{0,24}$)", re.I)
 
 KINDS = (

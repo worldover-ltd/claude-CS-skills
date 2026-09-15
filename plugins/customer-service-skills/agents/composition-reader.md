@@ -38,6 +38,12 @@ are `Percentage`, `CAS Number`, `EINECS Number` and the columns are the componen
 holds a name beside its figure. Quote the one line that carries your figure, pipes and empty cells and
 all. It reads less well than a stitched line and it is the difference between evidence and assertion.
 
+**Copy the characters, do not reflow them.** Converting a PDF to text mangles it: spaces vanish, and one
+cell of a table lands on the line below its own row. `Ingredientsdeterminednottobehazardous,including
+Balance` with `water` on the next line is one row of a table, and the line carrying `Balance` is the
+quote. Putting the spaces back is forgiven; moving `water` up in front of `Balance` is not, and it throws
+away a material whose figures were all correct.
+
 **Copy CAS and EC numbers digit by digit off the page.** The task lists every one the file contains under
 `casNumbers` and `ecNumbers`. Use those. Both are check-digit verified after you answer, and both are
 also checked for being printed in the file — so a number you know from elsewhere fails even when it is
