@@ -260,6 +260,24 @@ class VerificationTest(unittest.TestCase):
         self.assertEqual(state["materials"], [])
         self.assertIn("hazard bands", state["issues"][0]["why"])
 
+    def test_a_recut_saying_nothing_states_it_reaches_the_issues_in_the_users_words(self):
+        recut = self.session.root / "recut_R289.json"
+        recut.write_text(json.dumps({"identifier": "R289", "sourceFile": None,
+                                     "why": "the supplier has never sent one"}), encoding="utf-8")
+        self.session.run("apply_recut.py", str(recut))
+        state = self.collect()
+        self.assertEqual(state["materials"], [])
+        self.assertIn("never sent one", state["issues"][0]["why"],
+                      "a decision somebody made must not read as an agent that failed to answer")
+
+    def test_an_answer_filed_under_another_material_is_refused(self):
+        answer = good_answer(self.sha)
+        answer["identifier"] = "R999"
+        self.session.answer("R289", answer)
+        state = self.collect()
+        self.assertEqual(state["materials"], [])
+        self.assertIn("another material's", state["issues"][0]["why"])
+
     def test_a_recut_narrows_the_task_but_keeps_the_record_of_what_was_considered(self):
         self.session.answer("R289", good_answer(self.sha))
         self.collect()
@@ -337,6 +355,62 @@ class ContradictionTest(unittest.TestCase):
         self.assertEqual(state["materials"], [], "neither reading can be trusted over the other")
         self.assertEqual(len(state["contradictions"]), 1)
         self.assertEqual(sorted(i["identifier"] for i in state["issues"]), ["R289", "R290"])
+
+
+class ReuseTest(unittest.TestCase):
+    """Adopting an earlier extraction, and folding the rest back in without losing it."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.folder = self.root / "documents"
+        (self.folder / "R289 - Dissolvine").mkdir(parents=True)
+        self.files = []
+        for name in ("TDS.pdf", "brochure.pdf"):
+            path = self.folder / "R289 - Dissolvine" / name
+            path.write_text("x", encoding="utf-8")
+            self.files.append(path)
+        self.session = self.root / "session"
+        self.session.mkdir()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def manifest(self, paths, where):
+        records = []
+        for path in paths:
+            text_file = self.root / f"{path.stem}.md"
+            text_file.write_text("some text", encoding="utf-8")
+            records.append({"path": str(path), "kind": "text",
+                            "textFile": str(text_file), "ocrTextFile": None, "images": []})
+        where.write_text(json.dumps({"documents": records}), encoding="utf-8")
+        return where
+
+    def run_reuse(self, *arguments):
+        script = (REPO / "plugins/customer-service-skills/skills/extract-composition-from-documents"
+                  / "lib/reuse_extraction.py")
+        result = subprocess.run([sys.executable, str(script), str(self.session), str(self.folder),
+                                 *arguments], capture_output=True, text=True)
+        if result.returncode:
+            raise AssertionError("reuse_extraction failed:" + result.stdout + result.stderr)
+        return result.stdout
+
+    def test_adopting_lists_only_what_the_earlier_run_missed(self):
+        earlier = self.manifest(self.files[:1], self.root / "earlier.json")
+        self.run_reuse("--adopt", str(earlier))
+        still = json.loads((self.session / "STILL_TO_EXTRACT.json").read_text(encoding="utf-8"))
+        self.assertEqual([Path(p).name for p in still], ["brochure.pdf"])
+
+    def test_merging_keeps_what_was_adopted(self):
+        earlier = self.manifest(self.files[:1], self.root / "earlier.json")
+        self.run_reuse("--adopt", str(earlier))
+        rest = self.manifest(self.files[1:], self.root / "rest.json")
+        self.run_reuse("--merge", str(rest))
+        held = json.loads((self.session / "EXTRACTED.json").read_text(encoding="utf-8"))
+        self.assertEqual(sorted(Path(r["path"]).name for r in held["documents"]),
+                         ["TDS.pdf", "brochure.pdf"],
+                         "the extractor writes a whole manifest; merging is what stops it replacing "
+                         "the adopted one with just the leftovers")
 
 
 class WorkbookTest(unittest.TestCase):

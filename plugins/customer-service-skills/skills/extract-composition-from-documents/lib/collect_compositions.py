@@ -31,7 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import codes
 import verbatim
-from signals import read_text
+from signals import file_key, read_text
 
 
 def load(path):
@@ -93,7 +93,8 @@ def main():
 
     manifest = load(session / "READINGS.json")
     candidates = {m["identifier"]: m for m in load(session / "CANDIDATES.json")["materials"]}
-    extracted = {record["path"]: record for record in load(session / "EXTRACTED.json")["documents"]}
+    extracted = {file_key(record["path"]): record
+                 for record in load(session / "EXTRACTED.json")["documents"]}
     by_sha = {}
     for document in load(session / "DOCUMENTS.json"):
         by_sha.setdefault(document["sha"], document)
@@ -110,6 +111,13 @@ def main():
         answer_path = Path(task["output"])
         shown = {c["sha"]: c for c in candidates.get(identifier, {}).get("candidates", [])}
         names = [c["fileName"] for c in shown.values()]
+        # A recut can record that no file in the folder states this composition. That is a decision a
+        # person made, and it reaches the issues in their words rather than as a missing answer.
+        recut = (load(task["input"]) if Path(task["input"]).is_file() else {}).get("recut") or {}
+        if recut.get("sourceFile", "") is None:
+            issues.append({"identifier": identifier, "candidates": names,
+                           "why": recut.get("why") or "recorded as having no composition document"})
+            continue
         if not answer_path.is_file():
             unanswered.append(identifier)
             issues.append({"identifier": identifier, "why": "no sub agent answered for this material",
@@ -122,6 +130,11 @@ def main():
                            "candidates": names})
             continue
 
+        said = (answer.get("identifier") or "").strip()
+        if said and said != identifier:
+            issues.append({"identifier": identifier, "candidates": names,
+                           "why": f"the answer is filed under {said!r}, so it is another material's"})
+            continue
         chosen = shown.get((answer.get("sourceSha") or "").strip())
         if not answer.get("sourceSha"):
             issues.append({"identifier": identifier, "candidates": names,
@@ -134,7 +147,7 @@ def main():
                                   f"{answer.get('sourceFile') or answer['sourceSha']}"})
             continue
 
-        text = read_text(extracted.get(by_sha.get(chosen["sha"], {}).get("path"), {}))
+        text = read_text(extracted.get(file_key(by_sha.get(chosen["sha"], {}).get("path")), {}))
         shapes = verbatim.forms(text)
         rows, failures = verify(answer.get("rows"), shapes)
 

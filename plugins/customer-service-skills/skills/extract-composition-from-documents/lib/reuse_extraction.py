@@ -12,17 +12,28 @@ Reading a folder of three thousand documents takes about half an hour, and on a 
 it - and, as importantly, what measures it: a session covering three quarters of the folder is worse
 than no session at all if the quarter it misses is silently read as materials with no composition.
 
---adopt copies the named manifest in as this session's EXTRACTED.json and prints the files it does not
-cover, which is what the extraction step should then be given.
+--adopt copies the named manifest in as this session's EXTRACTED.json and writes STILL_TO_EXTRACT.json,
+a list of paths the extraction step takes as its input. --merge then folds what that run produced back
+in, because the extractor writes a whole EXTRACTED.json of its own and would otherwise replace the
+adopted one with only the leftovers - turning a reuse of three quarters of the folder into a run that
+has read a quarter of it.
 
-The join is on the absolute path. A manifest's own `relativePath` is the bare file name where the
-extractor was handed a list of files rather than a folder, so joining on that silently matches two
+The join is on the resolved absolute path. A manifest's own `relativePath` is the bare file name where
+the extractor was handed a list of files rather than a folder, so joining on that silently matches two
 documents of the same name under different materials.
 """
 
 import argparse
 import json
 from pathlib import Path
+
+
+def key(path):
+    """One spelling of a path, so two manifests written from differently-spelled roots still join."""
+    try:
+        return str(Path(path).resolve()).casefold()
+    except (OSError, TypeError):
+        return str(path).casefold()
 
 
 def covered(manifest_path, wanted):
@@ -37,10 +48,9 @@ def covered(manifest_path, wanted):
         source = record.get("textFile") or record.get("ocrTextFile")
         if not source or not Path(source).is_file():
             continue
-        try:
-            resolved = Path(record["path"]).resolve()
-        except (OSError, KeyError):
+        if "path" not in record:
             continue
+        resolved = key(record["path"])
         if resolved in wanted:
             hits.add(resolved)
     return hits, records
@@ -51,20 +61,40 @@ def main():
     parser.add_argument("session_dir", type=Path)
     parser.add_argument("documents_folder", type=Path)
     parser.add_argument("--adopt", type=Path, default=None)
+    parser.add_argument("--merge", type=Path, default=None,
+                        help="fold a second EXTRACTED.json into this session's, newest record winning")
     parser.add_argument("--workflow-root", type=Path, default=Path(".workflow/active"))
     args = parser.parse_args()
 
     folder = args.documents_folder.resolve()
-    wanted = {path.resolve() for path in folder.rglob("*") if path.is_file()}
+    wanted = {key(path) for path in folder.rglob("*") if path.is_file()}
     if not wanted:
         raise SystemExit(f"no files under {folder}")
+
+    if args.merge:
+        into = args.session_dir / "EXTRACTED.json"
+        held = json.loads(into.read_text(encoding="utf-8")) if into.is_file() else {"documents": []}
+        records = {key(r["path"]): r for r in held.get("documents") or [] if "path" in r}
+        added = json.loads(Path(args.merge).read_text(encoding="utf-8"))
+        before = len(records)
+        for record in added.get("documents") or []:
+            if "path" in record:
+                records[key(record["path"])] = record
+        held["documents"] = [records[k] for k in sorted(records)]
+        into.write_text(json.dumps(held, indent=1, ensure_ascii=False), encoding="utf-8")
+        print(f"{len(records)} file(s) in this session's extraction "
+              f"({before} held, {len(records) - before} new)")
+        missing = len(wanted - set(records))
+        print(f"  {len(wanted) - missing} of {len(wanted)} file(s) in the folder now have a record")
+        return
 
     if args.adopt:
         hits, _ = covered(args.adopt, wanted)
         args.session_dir.mkdir(parents=True, exist_ok=True)
         (args.session_dir / "EXTRACTED.json").write_text(
             Path(args.adopt).read_text(encoding="utf-8"), encoding="utf-8")
-        missing = sorted(str(path) for path in wanted - hits)
+        by_key = {key(path): path for path in folder.rglob("*") if path.is_file()}
+        missing = sorted(str(by_key[k]) for k in wanted - hits)
         listing = args.session_dir / "STILL_TO_EXTRACT.json"
         listing.write_text(json.dumps(missing, indent=1), encoding="utf-8")
         print(f"adopted {args.adopt}")

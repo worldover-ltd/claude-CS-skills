@@ -30,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "upload-documents" 
 import codes
 import dates as dates_module
 import item_index
-from signals import BALANCE, HEADING, INCI, PERCENT, read_text
+from signals import BALANCE, HEADING, INCI, PERCENT, file_key, read_text
 
 def score(text):
     """How much this file looks like it states a composition, and what it scored on."""
@@ -70,7 +70,7 @@ def main():
     branches = load("BRANCHES.json")["branches"]
     app = item_index.load(session / "WORKFLOW.json", session / "ITEMS.csv")
     documents = load("DOCUMENTS.json")
-    extracted = {record["path"]: record for record in load("EXTRACTED.json")["documents"]}
+    extracted = {file_key(record["path"]): record for record in load("EXTRACTED.json")["documents"]}
 
     by_material, unplaced, unreadable = {}, [], []
     for document in documents:
@@ -88,7 +88,7 @@ def main():
             "identifier": item["identifier"], "itemId": item["id"], "itemName": item["name"],
             "table": item["table"], "candidates": [], "filesSeen": 0})
         entry["filesSeen"] += 1
-        text = read_text(extracted.get(document["path"], {}))
+        text = read_text(extracted.get(file_key(document["path"]), {}))
         if not text:
             unreadable.append(relative)
             continue

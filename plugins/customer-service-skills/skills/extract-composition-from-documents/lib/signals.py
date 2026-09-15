@@ -31,6 +31,19 @@ INCI = re.compile(r"\bINCI\b", re.I)
 CODE_OR_PERCENT = re.compile(r"\b\d{2,7}-\d{2}-\d\b|\d+(?:[.,]\d+)?\s*%")
 
 
+def file_key(path):
+    """The one spelling of a path the passes join on.
+
+    An extraction adopted from an earlier session stores whatever root that run was given, and this run
+    was given its own. Joining on the raw string then matches nothing, which surfaces only as "N file(s)
+    had no text to score" - the silent failure the reuse step exists to prevent.
+    """
+    try:
+        return str(Path(path).resolve()).casefold()
+    except (OSError, TypeError):
+        return str(path).casefold()
+
+
 def read_text(record):
     """What the extraction got out of one file, whichever way it got it.
 

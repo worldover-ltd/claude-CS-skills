@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import codes
-from signals import CODE_OR_PERCENT, HEADING, read_text
+from signals import CODE_OR_PERCENT, HEADING, file_key, read_text
 
 
 def window(text, size):
@@ -57,7 +57,7 @@ def main():
     session = args.session_dir
 
     candidates = json.loads((session / "CANDIDATES.json").read_text(encoding="utf-8"))
-    extracted = {record["path"]: record for record in
+    extracted = {file_key(record["path"]): record for record in
                  json.loads((session / "EXTRACTED.json").read_text(encoding="utf-8"))["documents"]}
     by_path = {document["relativePath"]: document
                for document in json.loads((session / "DOCUMENTS.json").read_text(encoding="utf-8"))}
@@ -75,7 +75,7 @@ def main():
         files = []
         for candidate in material["candidates"]:
             document = by_path.get(candidate["relativePath"], {})
-            text = read_text(extracted.get(document.get("path"), {}))
+            text = read_text(extracted.get(file_key(document.get("path")), {}))
             files.append({
                 "sha": candidate["sha"], "fileName": candidate["fileName"],
                 "sourceFolder": candidate["folder"], "signals": candidate["signals"],

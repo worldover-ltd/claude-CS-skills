@@ -1,7 +1,7 @@
 ---
 name: extract-composition-from-documents
 description: "Composition: read a folder of supplier documents and say what each raw material is made of, taking every composition from the single document that states it. Triggers on \"extract-composition-from-documents\", when the user wants compositions read out of a customer's documents, or when they ask what a raw material is made of."
-allowed-tools: Agent, Skill, AskUserQuestion, TodoWrite, Read, Write, Edit, Bash, Glob, Grep
+allowed-tools: Agent, Skill, Monitor, AskUserQuestion, TodoWrite, Read, Write, Edit, Bash, Glob, Grep
 ---
 
 ### Context
@@ -22,7 +22,8 @@ work on, and — only once they have approved it — a workbook beside their doc
 
 All intermediate and output files live under `.workflow/active/${sessionId}/`, relative to the user's
 current working directory. At the start of a run, if `${sessionId}` is not already set for this
-conversation, generate one and create the directory before writing any files.
+conversation, generate one and create it, along with the `logs/` directory the long passes redirect
+into, before writing any files.
 
 Files inside this plugin are referenced with `${CLAUDE_PLUGIN_ROOT}`, set by Claude Code when the plugin
 is installed. Running from a raw checkout instead, treat it as the plugin root — the folder containing
@@ -68,7 +69,9 @@ Send **one sub agent**, briefed per
 
 Either one missing stops the run: tell the user which and what it blocks, then wait.
 
-Done when the sub agent has reported, and the `uv` command and the interpreter name are recorded.
+Done when the sub agent has reported, and both are recorded: `<uv>`, the `uv` command it found, and
+`<interpreter>`, the Python with `openpyxl`. Every command below uses one or the other, and on a machine
+where `uv` installed into the user's home neither is a bare word on `PATH`.
 
 # Step 2 — take the export and the folder
 
@@ -121,12 +124,21 @@ already.
 <interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/extract-composition-from-documents/lib/reuse_extraction.py" ".workflow/active/${sessionId}" "<folder>"
 ```
 
-That looks for `EXTRACTED.json` under every `.workflow/active/*/`, joins on absolute path, and reports
-what fraction of this folder each one covers. **Say the number out loud before reusing anything.** A
-stale session covering 60% of the folder is worse than no session, because the 40% it misses looks like
-materials with no composition document.
+That looks for `EXTRACTED.json` under every `.workflow/active/*/`, joins on the resolved path, and
+reports what fraction of this folder each one covers. It writes nothing. **Say the number out loud
+before reusing anything.** A stale session covering 60% of the folder is worse than no session, because
+the 40% it misses looks like materials with no composition document.
 
-Done when the user has seen what was found and said whether to reuse it.
+Where the user wants one, adopt it:
+
+```sh
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/extract-composition-from-documents/lib/reuse_extraction.py" ".workflow/active/${sessionId}" "<folder>" --adopt "<the EXTRACTED.json>"
+```
+
+That copies it in and writes `STILL_TO_EXTRACT.json`, the list of paths Step 5 then reads.
+
+Done when the user has seen what was found and said whether to reuse it, and `--adopt` has run where
+they said yes.
 
 # Step 5 — hash and read the documents
 
@@ -134,17 +146,32 @@ Done when the user has seen what was found and said whether to reuse it.
 <interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/hash_documents.py" "<folder>" ".workflow/active/${sessionId}"
 ```
 
-Then invoke the `extract-document-text` skill, giving it `DOCUMENTS.json` as its input and the session
-directory as its output, **with `--scans 3 --max-chars 0 --ocr`**.
+Then read them, through the `extract-document-text` skill:
 
-No character cap here, unlike a classification run: a composition sits in section 3 of a safety data
-sheet, and a head-and-tail cap reaches the cover page and the footer instead. `--ocr` is what turns a
-scanned composition statement into text — on the folder this came from, one material's only composition
+```sh
+<uv> run --with rapidocr-onnxruntime "${CLAUDE_PLUGIN_ROOT}/skills/extract-document-text/lib/extract_documents.py" ".workflow/active/${sessionId}/DOCUMENTS.json" ".workflow/active/${sessionId}" --scans 3 --ocr
+```
+
+`--with rapidocr-onnxruntime` is not optional: `--ocr` without it stops the run before it converts a
+single file. No `--max-chars`, unlike a classification run — a composition sits in section 3 of a safety
+data sheet, and a head-and-tail cap reaches the cover page and the footer instead. OCR is what turns a
+scanned composition statement into text; on the folder this came from, one material's only composition
 was a photographed letter.
 
-Where Step 4 found an extraction to reuse, pass only the files it did not cover.
+**Where Step 4 adopted an extraction**, read only what it did not cover, into a directory of its own,
+and fold the result back in — the extractor writes a whole `EXTRACTED.json` and would otherwise replace
+the adopted one with just the leftovers:
 
-Done when `EXTRACTED.json` answers for every file in `DOCUMENTS.json`.
+```sh
+<uv> run --with rapidocr-onnxruntime "${CLAUDE_PLUGIN_ROOT}/skills/extract-document-text/lib/extract_documents.py" ".workflow/active/${sessionId}/STILL_TO_EXTRACT.json" ".workflow/active/${sessionId}/rest" --scans 3 --ocr
+```
+
+```sh
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/extract-composition-from-documents/lib/reuse_extraction.py" ".workflow/active/${sessionId}" "<folder>" --merge ".workflow/active/${sessionId}/rest/EXTRACTED.json"
+```
+
+Done when `EXTRACTED.json` answers for every file in `DOCUMENTS.json` — which the merge reports, as the
+count of files in the folder that now have a record.
 
 # Step 6 — shortlist what could be a composition
 
@@ -202,7 +229,7 @@ user with what stopped each one.
 # Step 9 — put the page in front of them
 
 ```sh
-uv run "${CLAUDE_PLUGIN_ROOT}/skills/extract-composition-from-documents/lib/build_review_page.py" ".workflow/active/${sessionId}" "<folder>"
+<uv> run "${CLAUDE_PLUGIN_ROOT}/skills/extract-composition-from-documents/lib/build_review_page.py" ".workflow/active/${sessionId}" "<folder>"
 ```
 
 One card per material: the table on the left, the page of the PDF it was read from on the right. Give
@@ -218,7 +245,9 @@ Where they disagree with a pick, write a recut and replay it:
 ```
 
 That narrows the material's task to the file they named and clears the old answer. Send that agent
-again, run Step 8, rebuild the page. Correcting rows by hand instead puts values in the workbook that
+again, run Step 8, rebuild the page. A recut carrying `"sourceFile": null` instead records that nothing
+in the folder states this composition, in the user's words — no agent is sent for it, and Step 8 puts
+their reason on `MATERIALS_WITH_ISSUES`. Correcting rows by hand instead puts values in the workbook that
 nothing checked.
 
 Done when the user has been through the page and either approved it or had their recuts replayed.
