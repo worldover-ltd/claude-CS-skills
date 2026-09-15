@@ -36,6 +36,14 @@ def key(path):
         return str(path).casefold()
 
 
+def _cap(manifest_path):
+    """The per-document character cap an earlier run used, where it used one."""
+    try:
+        return json.loads(Path(manifest_path).read_text(encoding="utf-8")).get("maxChars") or 0
+    except (OSError, json.JSONDecodeError):
+        return 0
+
+
 def covered(manifest_path, wanted):
     """Which of the wanted paths this manifest already holds usable text for."""
     try:
@@ -112,6 +120,13 @@ def main():
         share = 100.0 * len(hits) / len(wanted)
         print(f"  {share:5.1f}%  {len(hits)} of {len(wanted)} covered   "
               f"({records} record(s) in it)   {manifest_path}")
+        # A run made for classifying documents caps the text it keeps. The whole conversion is still on
+        # disk under `fullTextFile` and this skill reads that, so the cap is survivable - but a manifest
+        # without the uncapped files beside it is not, and that is worth knowing before adopting it.
+        cap = _cap(manifest_path)
+        if cap:
+            print(f"         capped at {cap} characters a document; the uncapped text is read where "
+                  f"the extraction left it beside the manifest")
     print("\nAdopt one with --adopt <path>, which also lists what it does not cover.")
 
 

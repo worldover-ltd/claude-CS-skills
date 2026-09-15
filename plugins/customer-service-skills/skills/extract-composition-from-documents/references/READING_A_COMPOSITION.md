@@ -63,6 +63,12 @@ So the agent returns the date *and its kind*, and `plan_readings.py` puts every 
 front of it with the label the document used. Ranking on the largest number on the page picks the wrong
 document in both cases above.
 
+**A grade is not a supplier.** Where two files state full compositions for what looks like the same
+substance, check them against the material's own name before ranking them by date. `Ethanol NS F4` and
+`Ethanol SAA F3` are two grades in one folder, denatured differently — the second names methanol at up
+to 2%, which is not in the first at all. Both score identically, both are real compositions, and only
+one is this material.
+
 Several suppliers under one material code is normal — a code's folder can hold four suppliers' sheets
 for the same INCI. The most recent qualifying document wins regardless of which supplier it came from,
 and the review page lists every folder the candidates came from so the choice is visible.
@@ -84,7 +90,8 @@ by
 
 The quotation check runs the five tiers of `verbatim.py`, so a line the agent stitched together from a
 heading and the cell beside it still passes — the words are the document's, only the line is the
-agent's. An invented line passes none of them.
+agent's. An invented line passes none of them, and neither does one an agent has joined with `...`,
+which is why the brief tells it to quote a single line even where the table is printed on its side.
 
 **The whole material is blocked, not the offending row.** A composition with one row quietly dropped
 still looks like a composition, and still sums close enough to 100 that nobody asks.

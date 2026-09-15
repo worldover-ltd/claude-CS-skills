@@ -231,7 +231,38 @@ class VerificationTest(unittest.TestCase):
         self.session.answer("R289", answer)
         state = self.collect()
         self.assertEqual(state["materials"], [])
-        self.assertIn("no date was reported", state["issues"][0]["why"])
+        self.assertIn("prints a date and the answer reported none", state["issues"][0]["why"])
+
+    def test_a_document_that_prints_no_date_still_yields_a_composition(self):
+        """Plenty of composition statements carry no date. Demanding one threw away a sound reading."""
+        undated = COMPOSITION.replace("Issue Date: 14/03/2023   Print Date: 02/09/2024", "")
+        session = Session(tempfile.mkdtemp(dir=self.tmp.name))
+        sha = session.add("R289 - Dissolvine", "TDS.pdf", undated)
+        session.close()
+        session.run("score_composition.py")
+        session.run("plan_readings.py")
+        answer = good_answer(sha)
+        answer["documentDate"] = {"written": "", "label": "", "kind": ""}
+        session.answer("R289", answer)
+        session.run("collect_compositions.py")
+        state = session.read("COMPOSITIONS.json")
+        self.assertEqual(state["issues"], [])
+        self.assertEqual(len(state["materials"][0]["rows"]), 2)
+
+    def test_a_date_written_another_way_round_is_still_the_documents_date(self):
+        """`8 December 2022` off a page printing `2022-12-08` is the same date, not a fabrication."""
+        dated = COMPOSITION.replace("Issue Date: 14/03/2023", "Issue Date: 2023-03-14")
+        session = Session(tempfile.mkdtemp(dir=self.tmp.name))
+        sha = session.add("R289 - Dissolvine", "TDS.pdf", dated)
+        session.close()
+        session.run("score_composition.py")
+        session.run("plan_readings.py")
+        answer = good_answer(sha)
+        answer["documentDate"] = {"written": "14 March 2023", "label": "Issue Date", "kind": "issue"}
+        session.answer("R289", answer)
+        session.run("collect_compositions.py")
+        state = session.read("COMPOSITIONS.json")
+        self.assertEqual(state["issues"], [])
 
     def test_a_date_the_document_does_not_print_is_refused(self):
         answer = good_answer(self.sha)

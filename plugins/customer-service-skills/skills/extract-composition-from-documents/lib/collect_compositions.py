@@ -30,6 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import codes
+import dates as dates_module
 import verbatim
 from signals import file_key, read_text
 
@@ -54,6 +55,19 @@ def number(value):
         return float(text)
     except ValueError:
         return None
+
+
+def date_is_printed(written, in_document, shapes):
+    """Whether the date the agent reported is one this document prints.
+
+    On the words first, then on the date they resolve to: an agent reading `2022-12-08` off the page and
+    writing `8 December 2022` has reported the document's own date, and a check that compares strings
+    calls that a fabrication and throws away the whole composition.
+    """
+    if verbatim.check(written, shapes) != "ABSENT":
+        return True
+    resolved = dates_module.as_iso(written)
+    return bool(resolved) and resolved in {entry["iso"] for entry in in_document if entry["iso"]}
 
 
 def verify(rows, shapes):
@@ -153,9 +167,13 @@ def main():
 
         printed = answer.get("documentDate") or {}
         written = (printed.get("written") or "").strip()
+        in_document = dates_module.find(text)
         if not written:
-            failures.append("no date was reported, so nothing says which document this is")
-        elif verbatim.check(written, shapes) == "ABSENT":
+            # Plenty of composition statements carry no date at all. Demanding one of those threw away
+            # a reading whose every figure and every quotation was right.
+            if in_document:
+                failures.append("the document prints a date and the answer reported none")
+        elif not date_is_printed(written, in_document, shapes):
             failures.append(f"the date {written!r} is not printed in the document")
 
         if failures:
@@ -210,9 +228,12 @@ def main():
           f"{sum(len(m['rows']) for m in materials)} row(s)")
     print("  quoted lines: " + ", ".join(f"{tiers.get(t, 0)} {t}" for t in verbatim.TIERS))
     if issues:
-        print(f"  {len(issues)} material(s) carry no composition:")
+        never = sum(1 for i in issues if not i.get("candidates"))
+        print(f"  {len(issues)} material(s) carry no composition - {never} had no candidate file at "
+              f"all, {len(issues) - never} were read and did not survive:")
         for issue in issues[:10]:
-            print(f"    {issue['identifier']}: {issue['why'][:110]}")
+            if issue.get("candidates"):
+                print(f"    {issue['identifier']}: {issue['why'][:110]}")
     if contradictions:
         print(f"  {len(contradictions)} document(s) read two different ways by two materials")
     print(f"\n-> {session / 'COMPOSITIONS.json'}")

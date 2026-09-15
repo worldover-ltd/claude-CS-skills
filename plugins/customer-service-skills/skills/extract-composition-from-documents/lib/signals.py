@@ -47,10 +47,16 @@ def file_key(path):
 def read_text(record):
     """What the extraction got out of one file, whichever way it got it.
 
+    `fullTextFile` first, because an extraction made for classifying documents caps each one at a few
+    thousand characters and a composition is rarely in the first of them. On the folder this came from,
+    851 of 2310 documents were at the cap, and one material's whole ingredient table sat in the 19,889
+    characters that had been trimmed - so the agent was asked to find a composition in text that no
+    longer contained one.
+
     Lives here rather than in a scoring module because three passes need it and none of them is about
     scoring.
     """
-    for key in ("textFile", "ocrTextFile"):
+    for key in ("fullTextFile", "textFile", "ocrTextFile"):
         path = record.get(key)
         if path and Path(path).is_file():
             text = Path(path).read_text(encoding="utf-8")

@@ -19,13 +19,24 @@ fetch.
 lists the whole thing. Where the percentages are on one file and the CAS numbers on another, you have
 not found a composition — you have found two partial documents, and the honest answer is the one below.
 
+**Read the material's name before you pick.** The task's `itemName` is what the customer buys, and a
+folder can hold the sheet for a different grade of the same substance. `Ethanol NS F4` has a file for
+grade NS F4 and another for grade SAA F3 — one denatured with tertiary butyl alcohol, the other with
+methanol at up to 2%. Both are composition tables and the wrong one is a different product. Where the
+name carries a grade, the file has to carry the same grade.
+
 **Where no file states a composition, say so.** Set `"sourceSha": null` and put in `why` what the files
 you were given actually are. That answer is worth as much as a transcription; a composition stitched
 together to avoid it is worth less than nothing, because nothing downstream can tell it from a real one.
 
-**Quote the line each row came from.** Your `quote` is checked, character by character, against the file
-you named. A row whose line is not in that file throws away the whole material, not just the row, so
-quote what you actually saw rather than what you believe the row means.
+**Quote one line each row came from, exactly as it appears.** Your `quote` is checked, character by
+character, against the file you named. A row whose line is not in that file throws away the whole
+material, not just the row.
+
+Never join two lines with `...` or anything else. Some suppliers print the table on its side — the rows
+are `Percentage`, `CAS Number`, `EINECS Number` and the columns are the components — so no single line
+holds a name beside its figure. Quote the one line that carries your figure, pipes and empty cells and
+all. It reads less well than a stitched line and it is the difference between evidence and assertion.
 
 **Copy CAS and EC numbers digit by digit off the page.** The task lists every one the file contains under
 `casNumbers` and `ecNumbers`. Use those. Both are check-digit verified after you answer, and both are
