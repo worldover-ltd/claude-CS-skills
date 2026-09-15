@@ -101,13 +101,46 @@ def good_answer(sha):
         "why": "the only file with a composition table",
         "rows": [
             {"ingredient": "Tetrasodium Glutamate Diacetate", "cas": "51981-21-6", "ec": "257-573-7",
-             "min": 47.5, "max": 48.0, "statedAs": "47.5-48.0",
+             "min": 47.5, "max": 48.0,
              "quote": "Tetrasodium glutamate diacetate  51981-21-6  257-573-7   47.5-48.0"},
             {"ingredient": "Aqua", "cas": "7732-18-5", "ec": "231-791-2",
-             "min": None, "max": None, "statedAs": "balance",
+             "min": None, "max": None,
              "quote": "Aqua/water                       7732-18-5   231-791-2   balance"},
         ],
     }
+
+
+class IdentifierRuleTest(unittest.TestCase):
+    """The two rule kinds this skill's Step 3 tells people to write.
+
+    Both live in upload-documents' item_index, and both were relied on by a real run before the repo
+    had them. A customer names a folder for the person walking past it, so the code is the first word of
+    a longer name; and where one code is held twice by the app, no pattern can read that off the names.
+    """
+
+    def setUp(self):
+        sys.path.insert(0, str(REPO / "plugins/customer-service-skills/skills/upload-documents/lib"))
+        import item_index
+        self.item_index = item_index
+
+    def test_a_pattern_reads_the_code_out_of_a_longer_folder_name(self):
+        rule = {"type": "folderLevelPattern", "level": 1, "pattern": r"^(R\d+)"}
+        value, why = self.item_index.identifier_for("R289 - Dissolvine GL-47-S/TDS.pdf", rule)
+        self.assertEqual(value, "R289")
+        self.assertIsNone(why)
+
+    def test_a_pattern_that_does_not_match_says_so_rather_than_guessing(self):
+        rule = {"type": "folderLevelPattern", "level": 1, "pattern": r"^(R\d+)"}
+        value, why = self.item_index.identifier_for("Shared certificates/TDS.pdf", rule)
+        self.assertIsNone(value)
+        self.assertIn("does not match", why)
+
+    def test_a_constant_names_the_item_whatever_the_folder_says(self):
+        rule = {"type": "constant", "value": "R120-2"}
+        value, why = self.item_index.identifier_for(
+            "R120 - Ercawax HCO 40 (Cremophor RH40)/PDS.pdf", rule)
+        self.assertEqual(value, "R120-2")
+        self.assertIsNone(why)
 
 
 class ShortlistTest(unittest.TestCase):
@@ -163,8 +196,8 @@ class VerificationTest(unittest.TestCase):
         rows = state["materials"][0]["rows"]
         self.assertEqual([r["ingredient"] for r in rows],
                          ["Tetrasodium Glutamate Diacetate", "Aqua"])
-        self.assertEqual(rows[1]["statedAs"], "balance")
         self.assertIsNone(rows[1]["min"], "a balance line states no figure and must not be given one")
+        self.assertIn("balance", rows[1]["quote"], "the words the document used live in the quote")
 
     def test_an_invented_line_blocks_the_whole_material(self):
         answer = good_answer(self.sha)
@@ -191,6 +224,14 @@ class VerificationTest(unittest.TestCase):
         state = self.collect()
         self.assertEqual(state["materials"], [])
         self.assertIn("check digit", state["issues"][0]["why"])
+
+    def test_an_answer_with_no_date_is_refused(self):
+        answer = good_answer(self.sha)
+        answer.pop("documentDate")
+        self.session.answer("R289", answer)
+        state = self.collect()
+        self.assertEqual(state["materials"], [])
+        self.assertIn("no date was reported", state["issues"][0]["why"])
 
     def test_a_date_the_document_does_not_print_is_refused(self):
         answer = good_answer(self.sha)
@@ -219,9 +260,10 @@ class VerificationTest(unittest.TestCase):
         self.assertEqual(state["materials"], [])
         self.assertIn("hazard bands", state["issues"][0]["why"])
 
-    def test_a_recut_narrows_the_task_to_the_file_the_user_named(self):
+    def test_a_recut_narrows_the_task_but_keeps_the_record_of_what_was_considered(self):
         self.session.answer("R289", good_answer(self.sha))
         self.collect()
+        before = len(self.session.read("CANDIDATES.json")["materials"][0]["candidates"])
         recut = self.session.root / "recut_R289.json"
         recut.write_text(json.dumps({"identifier": "R289", "sourceFile": "SDS.pdf",
                                      "why": "the newer sheet"}), encoding="utf-8")
@@ -230,6 +272,71 @@ class VerificationTest(unittest.TestCase):
         self.assertEqual([f["fileName"] for f in task["files"]], ["SDS.pdf"])
         self.assertFalse((self.session.root / "read" / "R289.json").is_file(),
                          "the old answer has to go, or the collector carries it unchanged")
+        self.assertEqual(len(self.session.read("CANDIDATES.json")["materials"][0]["candidates"]),
+                         before,
+                         "the shortlist is the record of what was considered, and a recut is exactly "
+                         "when somebody wants to see it")
+
+
+class NoCandidateTest(unittest.TestCase):
+    """A material whose folder holds nothing composition-shaped still has to reach the user by name."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.session = Session(self.tmp.name)
+        self.session.add("R289 - Dissolvine", "brochure.pdf", BROCHURE)
+        self.session.close()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_it_is_named_rather_than_dropped(self):
+        self.session.run("score_composition.py")
+        material = self.session.read("CANDIDATES.json")["materials"][0]
+        self.assertEqual(material["candidates"], [])
+        self.assertEqual(material["filesSeen"], 1)
+
+        self.session.run("plan_readings.py")
+        self.assertEqual([m["identifier"] for m in self.session.read("READINGS.json")["noCandidates"]],
+                         ["R289"])
+
+        self.session.run("collect_compositions.py")
+        state = self.session.read("COMPOSITIONS.json")
+        self.assertEqual(state["materials"], [])
+        self.assertEqual(state["issues"][0]["identifier"], "R289")
+        self.assertIn("reads like a composition", state["issues"][0]["why"])
+
+
+class ContradictionTest(unittest.TestCase):
+    """One document cannot be two compositions, however plausible each reading is on its own."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.session = Session(self.tmp.name)
+        (Path(self.tmp.name) / "ITEMS.csv").write_text(
+            "table,id,identifier,name,template,archived\n"
+            "raw_materials,1,R289,Dissolvine GL-47-S,Raw Material,false\n"
+            "raw_materials,2,R290,Dissolvine again,Raw Material,false\n", encoding="utf-8")
+        self.sha = self.session.add("R289 - Dissolvine", "TDS.pdf", COMPOSITION)
+        self.session.add("R290 - Dissolvine", "TDS.pdf", COMPOSITION, sha=self.sha)
+        self.session.close()
+        self.session.run("score_composition.py")
+        self.session.run("plan_readings.py")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_two_materials_reading_one_document_differently_both_stop(self):
+        self.session.answer("R289", good_answer(self.sha))
+        other = good_answer(self.sha)
+        other["identifier"] = "R290"
+        other["rows"] = other["rows"][:1]
+        self.session.answer("R290", other)
+        self.session.run("collect_compositions.py")
+        state = self.session.read("COMPOSITIONS.json")
+        self.assertEqual(state["materials"], [], "neither reading can be trusted over the other")
+        self.assertEqual(len(state["contradictions"]), 1)
+        self.assertEqual(sorted(i["identifier"] for i in state["issues"]), ["R289", "R290"])
 
 
 class WorkbookTest(unittest.TestCase):
@@ -237,6 +344,7 @@ class WorkbookTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.session = Session(self.tmp.name)
         self.sha = self.session.add("R289 - Dissolvine", "TDS.pdf", COMPOSITION)
+        self.session.add("R289 - Dissolvine", "SDS.pdf", HAZARD_BANDS)
         self.session.close()
         self.session.run("score_composition.py")
         self.session.run("plan_readings.py")
@@ -257,6 +365,28 @@ class WorkbookTest(unittest.TestCase):
         self.assertEqual(wb.sheetnames,
                          ["Composition", "Reference Documents", "MATERIALS_WITH_ISSUES"])
         self.assertEqual(wb["Composition"].max_row - 1, 2)
+
+    def test_a_second_approval_the_same_day_does_not_overwrite_the_first(self):
+        folder = Path(self.tmp.name) / "documents"
+        folder.mkdir()
+        self.session.run("write_workbook.py", str(folder), "--date", "2026-09-15")
+        self.session.run("write_workbook.py", str(folder), "--date", "2026-09-15")
+        self.assertTrue((folder / "RAW_MATERIAL_COMPOSITIONS 2026-09-15.xlsx").is_file())
+        self.assertTrue((folder / "RAW_MATERIAL_COMPOSITIONS 2026-09-15 (2).xlsx").is_file())
+
+    def test_the_reference_sheet_dates_the_files_that_lost(self):
+        folder = Path(self.tmp.name) / "documents"
+        folder.mkdir()
+        self.session.run("write_workbook.py", str(folder), "--date", "2026-09-15")
+        import openpyxl
+        sheet = openpyxl.load_workbook(
+            folder / "RAW_MATERIAL_COMPOSITIONS 2026-09-15.xlsx")["Reference Documents"]
+        rows = {sheet.cell(n, 2).value: (sheet.cell(n, 4).value, sheet.cell(n, 5).value)
+                for n in range(2, sheet.max_row + 1)}
+        self.assertEqual(rows["TDS.pdf"][0], "PRIMARY")
+        self.assertEqual(rows["SDS.pdf"][0], "considered")
+        self.assertTrue(rows["SDS.pdf"][1],
+                        "a loser with no date cannot show that it was the older document")
 
 
 if __name__ == "__main__":

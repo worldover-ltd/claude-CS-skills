@@ -1,0 +1,46 @@
+"""What a composition looks like on a page, in one place.
+
+Imported by score_composition.py, which culls the folder down to a shortlist, and by
+build_review_page.py, which decides which page of a PDF to render. Both ask the same question of a piece
+of text - is this a composition? - and an earlier version of this answered it twice, with two regexes
+that had drifted apart: one matched `ingredient list` and the other did not.
+
+Deliberately free of dependencies, so the uv-run review page can import it without the rest of the lib
+coming with it.
+"""
+
+import re
+from pathlib import Path
+
+# The headings suppliers print over a composition. Worth more than any other signal: a document saying
+# "Composition / information on ingredients" is telling you what the table under it is.
+HEADING = re.compile(
+    r"composition\s*[/:]?\s*information|information on ingredients|composition breakdown|"
+    r"product composition|ingredient declaration|ingredient list|inci breakdown|components \(inci|"
+    r"\bsection\s*3\b|\bcomposition\b", re.I)
+
+# Where a document discusses the substance rather than lists what is in it. An SDS names every
+# ingredient again in its toxicology section, which otherwise wins on word count alone.
+ELSEWHERE = re.compile(
+    r"toxicological|stability and reactivity|physical and chemical properties|transport information|"
+    r"disposal considerations|exposure controls|accidental release|fire[- ]fighting|first[- ]aid", re.I)
+
+PERCENT = re.compile(r"\d+(?:[.,]\d+)?\s*(?:[-\u2013]\s*\d+(?:[.,]\d+)?\s*)?%")
+BALANCE = re.compile(r"\bbalance\b|\bto\s*100\s*%|\bq\.?s\.?\s*(?:to|ad)\b|\bad\s*100\b", re.I)
+INCI = re.compile(r"\bINCI\b", re.I)
+CODE_OR_PERCENT = re.compile(r"\b\d{2,7}-\d{2}-\d\b|\d+(?:[.,]\d+)?\s*%")
+
+
+def read_text(record):
+    """What the extraction got out of one file, whichever way it got it.
+
+    Lives here rather than in a scoring module because three passes need it and none of them is about
+    scoring.
+    """
+    for key in ("textFile", "ocrTextFile"):
+        path = record.get(key)
+        if path and Path(path).is_file():
+            text = Path(path).read_text(encoding="utf-8")
+            if text.strip():
+                return text
+    return ""

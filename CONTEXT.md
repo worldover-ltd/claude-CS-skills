@@ -138,10 +138,21 @@ not a composition with better coverage; it is a different kind of answer, one no
 check. See `docs/adr/0009`.
 _Avoid_: primary (the *role* on the reference sheet is `PRIMARY`; the concept is the single source)
 
+**Material**:
+An *item* on the `raw_materials` table, seen from this skill. The wider plugin says *item*, because it
+also means products; a composition only ever belongs to a raw material, and this is the word for one.
+_Avoid_: ingredient (that is what a material is made of), substance, product
+
 **Candidate**:
 One file that might state a material's composition, shortlisted by score before any agent reads it. A
 candidate is a guess about a file; what it turns out to be is the sub agent's answer.
 _Avoid_: match, hit, source (a *single source* is the one that won)
+
+**Composition reading**:
+One sub agent's answer for one *material*: the *candidate* it picked as the *single source*, and the
+rows it transcribed off it. Distinct from a *reading* in the document-upload sense, which is one
+classification of one `(sha, table)`.
+_Avoid_: reading on its own (it is already taken), extraction, transcription
 
 **Balance row**:
 An ingredient a document gives no figure for, stating only that it makes up the rest - `Balance`,

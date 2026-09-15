@@ -25,10 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import codes
-from score_composition import HEADING, read_text
-
-
-CODE_OR_PERCENT = re.compile(r"\b\d{2,7}-\d{2}-\d\b|\d+(?:[.,]\d+)?\s*%")
+from signals import CODE_OR_PERCENT, HEADING, read_text
 
 
 def window(text, size):
@@ -67,9 +64,13 @@ def main():
 
     tasks_dir = session / "readings"
     tasks_dir.mkdir(parents=True, exist_ok=True)
-    manifest = []
+    manifest, without = [], []
     for material in candidates["materials"]:
         if not material["candidates"]:
+            # Carried rather than skipped: a material whose folder holds nothing composition-shaped is
+            # an answer the run owes the user by name, and the collector turns this into an issue.
+            without.append({"identifier": material["identifier"], "itemName": material["itemName"],
+                            "filesSeen": material.get("filesSeen", 0)})
             continue
         files = []
         for candidate in material["candidates"]:
@@ -97,11 +98,14 @@ def main():
 
     (session / "read").mkdir(parents=True, exist_ok=True)
     (session / "READINGS.json").write_text(
-        json.dumps({"tasks": manifest, "window": args.window}, indent=2, ensure_ascii=False),
+        json.dumps({"tasks": manifest, "noCandidates": without, "window": args.window},
+                   indent=2, ensure_ascii=False),
         encoding="utf-8")
 
     print(f"{len(manifest)} task(s), "
           f"{sum(t['fileCount'] for t in manifest)} candidate file(s) between them")
+    if without:
+        print(f"  {len(without)} material(s) have no candidate at all and go straight to the issues")
     print(f"\n-> {session / 'READINGS.json'}")
 
 

@@ -51,6 +51,19 @@ def sheet(wb, title, headers, widths, rows, first=False):
     return ws
 
 
+def best_date(dates):
+    """The latest date a candidate prints: the words on the page, and the kind of date they label.
+
+    Only ever used for a file that lost. The winner's date is the one its sub agent read and judged,
+    which is a different and better thing than the largest number on the page.
+    """
+    resolved = [entry for entry in dates or [] if entry.get("iso")]
+    if not resolved:
+        return "", ""
+    latest = max(resolved, key=lambda entry: entry["iso"])
+    return latest.get("written", ""), latest.get("kind", "")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("session_dir", type=Path)
@@ -63,7 +76,7 @@ def main():
 
     composition = [
         (m["identifier"], m["itemName"], row["ingredient"], row["cas"], row["ec"],
-         row["min"], row["max"], row["statedAs"], row["quote"], m["sourceFile"],
+         row["min"], row["max"], row["quote"], m["sourceFile"],
          "; ".join(m.get("sourceFolders") or []))
         for m in sorted(materials, key=lambda m: m["identifier"]) for row in m["rows"]]
 
@@ -74,8 +87,8 @@ def main():
             references.append((
                 material["identifier"], entry["fileName"], entry["folder"],
                 "PRIMARY" if entry["chosen"] else "considered",
-                printed.get("written", "") if entry["chosen"] else "",
-                printed.get("kind", "") if entry["chosen"] else "",
+                *((printed.get("written", ""), printed.get("kind", "")) if entry["chosen"]
+                  else best_date(entry.get("dates"))),
                 material["why"] if entry["chosen"] else entry["why"]))
 
     issues = [(issue["identifier"], issue.get("sourceFile", ""),
@@ -84,9 +97,9 @@ def main():
 
     wb = openpyxl.Workbook()
     sheet(wb, "Composition",
-          ["code", "raw material", "ingredient", "CAS", "EC", "min %", "max %", "stated as",
+          ["code", "raw material", "ingredient", "CAS", "EC", "min %", "max %",
            "quoted line", "source file", "source folders"],
-          [12, 30, 40, 16, 14, 9, 9, 16, 60, 46, 40], composition, first=True)
+          [12, 30, 40, 16, 14, 9, 9, 60, 46, 40], composition, first=True)
     sheet(wb, "Reference Documents",
           ["code", "file", "source folder", "role", "date printed", "kind of date", "why"],
           [12, 50, 34, 13, 16, 13, 70], references)
@@ -95,6 +108,12 @@ def main():
           [12, 44, 56, 80], issues)
 
     out = args.documents_folder / f"RAW_MATERIAL_COMPOSITIONS {args.date}.xlsx"
+    # Two approvals in one day are two workbooks. The date alone is not a unique name, and somebody may
+    # already be working from the one written an hour ago.
+    run = 2
+    while out.exists():
+        out = args.documents_folder / f"RAW_MATERIAL_COMPOSITIONS {args.date} ({run}).xlsx"
+        run += 1
     wb.save(out)
 
     print(f"{len(composition)} ingredient row(s) across {len(materials)} material(s)")

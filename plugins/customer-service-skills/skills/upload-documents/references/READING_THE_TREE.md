@@ -101,12 +101,20 @@ before the gate rather than after: it is the thing under test. One entry per bra
 - **`table`** — the *item_kind*'s table, as `WORKFLOW.json` spells it. A table that is not there stops the
   script rather than producing a sheet the migration cannot place. The branch names the table and never an
   *item_template*: which *item_template* an item is on is the items file's answer, not the folder's.
-- **`identifier`** — how to get the item's identifier out of a path, in one of two forms:
+- **`identifier`** — how to get the item's identifier out of a path, in one of four forms:
   - `{"type": "folderLevel", "level": N}` — the Nth folder level, counting from 1 at the top of the
     relative path. `Raw Materials/RM-0142/SDS.pdf` at level 2 yields `RM-0142`.
+  - `{"type": "folderLevelPattern", "level": N, "pattern": "<regex>"}` — the same level, with the
+    identifier read out of the folder's name. `R289 - Dissolvine GL-47-S` under `"^(R\\d+)"` yields
+    `R289`. Usually the one you want: a customer names a folder for the person walking past it, and the
+    code is only the first word of it.
   - `{"type": "fileName", "pattern": "<regex>"}` — matched against the file name; the first capture group
     is the identifier, or the whole match where the pattern has no group. Escape backslashes for JSON
     (`\\d`), and prefer anchoring the pattern at the start.
+  - `{"type": "constant", "value": "<identifier>"}` — every file under this branch belongs to the item
+    named, whatever its folder says. For the folder whose name carries no code, and for the code the app
+    holds twice: `R120 - Ercawax HCO 40` and `R120 - Ercawax HCO 40 (Cremophor RH40)` are two suppliers
+    the app keeps as `R120-1` and `R120-2`, and no pattern reads that off the names.
 - **`hintLevel`** — optional. The folder level whose names look like kinds of document, passed to the
   classifier as `folderHint`. Leave it out where no level does.
 

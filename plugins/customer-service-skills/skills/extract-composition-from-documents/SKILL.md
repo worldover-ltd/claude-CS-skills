@@ -1,6 +1,6 @@
 ---
 name: extract-composition-from-documents
-description: "Read a folder of supplier documents and say what each raw material is made of, taking every composition from the one document that states it. Triggers on \"extract-composition-from-documents\", or when the user wants ingredient compositions, percentages, CAS or EC numbers pulled out of a customer's documents."
+description: "Composition: read a folder of supplier documents and say what each raw material is made of, taking every composition from the single document that states it. Triggers on \"extract-composition-from-documents\", when the user wants compositions read out of a customer's documents, or when they ask what a raw material is made of."
 allowed-tools: Agent, Skill, AskUserQuestion, TodoWrite, Read, Write, Edit, Bash, Glob, Grep
 ---
 
@@ -40,31 +40,23 @@ Monitor({ command: "<the pass> 2>&1 1>>'.workflow/active/${sessionId}/logs/<pass
           description: "reading the documents", persistent: true })
 ```
 
-### The rule the whole run is built on
+### The single source
 
-**A composition comes from one document that states the whole thing.** Not a percentage from an SDS and
-a name from a data sheet; not a figure from a grade table filling a gap in a supplier's letter. Where no
-single document states it, the material has no composition and the run says so.
-
-This is a hard gate because the failure it prevents is invisible afterwards. On the folder this skill
-came from, one material carried a denaturant at 0.25% taken from a table that defines what the *grade*
-means — the product's own sheet named six possible denaturants and identified none. Another was
-assembled from four documents, with ranges no document states. Both read as compositions. Neither was
-one. `docs/adr/0009` is the argument.
+**A composition comes from one document that states the whole thing.** Where no single document states
+it, the material has no composition and the run says so. This is a hard gate, and it costs real
+information on real folders: `docs/adr/0009` is the argument and what it measured.
 
 What counts as a composition, and what only looks like one, is
 `${CLAUDE_PLUGIN_ROOT}/skills/extract-composition-from-documents/references/READING_A_COMPOSITION.md`.
 
 ### The unit
 
-A **material** is one row in the app's items file, and it gets one composition. A **candidate** is one
-file that might state it. A **reading** is one sub agent's answer for one material: which candidate it
-picked, and the rows it transcribed.
+The words this skill uses — *material*, *candidate*, *single source*, *composition reading*, *balance
+row*, *recut*, *kind of date* — are defined in `CONTEXT.md` under `# Composition`.
 
-One file can hold several materials' worth of paper and one material can have four suppliers' folders
-under it — a code's folder holding four sheets for the same INCI is normal. The most recent qualifying
-document wins whichever supplier it came from, and the review page lists every folder so the choice is
-visible rather than silent.
+One material can have four suppliers' folders under it — a code's folder holding four sheets for the same
+INCI is normal. The most recent qualifying document wins whichever supplier it came from, and the review
+page lists every folder so the choice is visible rather than silent.
 
 ### Process
 
@@ -201,8 +193,8 @@ A model asked for the CAS of glycerin answers 56-81-5 whether or not the page sa
 invented to make a table sum to 100 reads exactly like a transcribed one. This pass is the only thing
 that tells them apart.
 
-Writes `COMPOSITIONS.json` — the run's state, and what the next two steps are both built from. Nothing
-is written to Excel until the user asks for it.
+Writes `COMPOSITIONS.json` — the run's state, and what the next two steps are both built from. Excel
+comes at Step 10, on the user's word.
 
 Done when `COMPOSITIONS.json` exists and the materials it could not verify have been read out to the
 user with what stopped each one.
@@ -229,7 +221,7 @@ That narrows the material's task to the file they named and clears the old answe
 again, run Step 8, rebuild the page. Correcting rows by hand instead puts values in the workbook that
 nothing checked.
 
-Done when the user has been through the page and either approved it or had their corrections replayed.
+Done when the user has been through the page and either approved it or had their recuts replayed.
 
 # Step 10 — write the workbook
 
@@ -255,13 +247,13 @@ Their next question is usually one of three.
 **"Why this file and not that one?"** The `Reference Documents` sheet answers it — every candidate, its
 role, the date the run read and what kind of date it was. That is the sheet to open, not the run's logs.
 
-**"This composition is wrong."** Ask which row disagrees with the picture on the review page. A row that
-disagrees with the page is a recut. A row that agrees with the page but disagrees with what they know of
+**"This composition is wrong."** Ask which row disagrees with the picture on the review page. A row
+that disagrees with the page is a recut. A row that agrees with the page but disagrees with what they know of
 the material is a conversation with their supplier, and the page is the evidence to send them.
 
 **"Why does this material have nothing?"** Read them the `MATERIALS_WITH_ISSUES` line. The usual answer
 is that the folder holds certificates, brochures and specifications but no composition — which is a
 document to request, not a run to redo.
 
-What this run does not do: match ingredient names against the app's ingredient catalogue, and assign
-ingredient functions. Both need an export this skill never asks for.
+A run ends at the composition: the ingredient names as the supplier wrote them, the figures beside them,
+and the document both came from.

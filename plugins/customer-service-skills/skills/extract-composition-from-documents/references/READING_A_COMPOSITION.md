@@ -69,7 +69,9 @@ and the review page lists every folder the candidates came from so the choice is
 
 ## What comes back, and what is checked
 
-The answer's shape is in the agent's own instructions. Four things are checked by
+The answer's shape is in the agent's own instructions — `min` and `max` only where the document gives
+figures, so a balance row carries neither and its quoted line carries the word. Four things are checked
+by
 `collect_compositions.py` before any of it counts, and failing any one carries the whole material to
 `MATERIALS_WITH_ISSUES` with no rows:
 

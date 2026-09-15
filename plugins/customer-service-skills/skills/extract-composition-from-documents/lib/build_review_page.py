@@ -26,19 +26,14 @@ import argparse
 import html
 import json
 import re
+import sys
 from pathlib import Path
 
 import pypdfium2
 
-# Pages that discuss the substance rather than list what is in it. Without this the toxicology section
-# outscores the composition on word count alone, because it names every ingredient too.
-ELSEWHERE = re.compile(
-    r"toxicological|stability and reactivity|physical and chemical properties|transport information|"
-    r"disposal considerations|exposure controls|accidental release|fire[- ]fighting|first[- ]aid", re.I)
-HEADING = re.compile(
-    r"composition\s*[/:]?\s*information|information on ingredients|composition breakdown|"
-    r"product composition|ingredient declaration|ingredient list|inci breakdown|components \(inci|"
-    r"\bsection\s*3\b", re.I)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from signals import ELSEWHERE, HEADING
 
 
 def page_texts(pdf):
@@ -169,7 +164,7 @@ def main():
         rows = "".join(
             f"<tr><td>{cell(r['ingredient'])}</td><td class=c>{cell(r['cas'])}</td>"
             f"<td class=c>{cell(r['ec'])}</td><td class=n>{cell(r['min'])}</td>"
-            f"<td class=n>{cell(r['max'])}</td><td class=c>{cell(r['statedAs'])}</td></tr>"
+            f"<td class=n>{cell(r['max'])}</td></tr>"
             for r in material["rows"])
         folders = "".join(f"<span>{cell(folder)}</span>"
                           for folder in material.get("sourceFolders") or [])
@@ -183,8 +178,7 @@ def main():
   <div class=split>
     <div class=left>
       <table>
-        <thead><tr><th>Name</th><th>CAS</th><th>EC</th><th>min %</th><th>max %</th>
-        <th>stated as</th></tr></thead>
+        <thead><tr><th>Name</th><th>CAS</th><th>EC</th><th>min %</th><th>max %</th></tr></thead>
         <tbody>{rows}</tbody>
       </table>
       <p class=folders>{folders}</p>

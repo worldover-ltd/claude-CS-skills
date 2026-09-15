@@ -48,10 +48,10 @@ as old as the content it restates, and saying so is what stops a stale sheet out
   "why": "the only file with a composition table; the SDS gives hazard bands and omits the water",
   "rows": [
     { "ingredient": "Tetrasodium Glutamate Diacetate", "cas": "51981-21-6", "ec": "257-573-7",
-      "min": 47.5, "max": 48.0, "statedAs": "47.5-48.0",
+      "min": 47.5, "max": 48.0,
       "quote": "Tetrasodium glutamate diacetate  51981-21-6  257-573-7  47.5-48.0  Chelating agent" },
     { "ingredient": "Aqua", "cas": "7732-18-5", "ec": "231-791-2",
-      "min": null, "max": null, "statedAs": "balance",
+      "min": null, "max": null,
       "quote": "Aqua/water  7732-18-5  231-791-2  balance  Solvent" }
   ],
   "rejected": [
@@ -60,9 +60,9 @@ as old as the content it restates, and saying so is what stops a stale sheet out
 }
 ```
 
-`statedAs` is the document's own words for the quantity: `70 %`, `≥ 99.8 %`, `balance`, `to 100%`.
-Fill `min` and `max` only where the document gives figures — a balance line states no figure, and
-computing one from the other rows is arithmetic the document does not contain.
+Fill `min` and `max` only where the document gives figures. A balance line — `balance`, `to 100%`,
+`q.s.` — states no figure, so both stay `null` and the quoted line carries the word. Computing the
+complement from the other rows is arithmetic the document does not contain.
 
 Where the whole material has no composition document, `rows` is empty and `sourceSha` is `null`.
 

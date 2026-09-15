@@ -30,28 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "upload-documents" 
 import codes
 import dates as dates_module
 import item_index
-
-# The headings suppliers print over a composition. Worth more than any other signal: a document that
-# says "Composition / information on ingredients" is telling you what the table under it is.
-HEADING = re.compile(
-    r"composition\s*[/:]?\s*information|information on ingredients|composition breakdown|"
-    r"product composition|ingredient declaration|inci breakdown|components \(inci|"
-    r"\bsection\s*3\b|\bcomposition\b", re.I)
-PERCENT = re.compile(r"\d+(?:[.,]\d+)?\s*(?:[-\u2013]\s*\d+(?:[.,]\d+)?\s*)?%")
-BALANCE = re.compile(r"\bbalance\b|\bto\s*100\s*%|\bq\.?s\.?\s*(?:to|ad)\b|\bad\s*100\b", re.I)
-INCI = re.compile(r"\bINCI\b", re.I)
-
-
-def read_text(record):
-    """What the extraction got out of this file, whichever way it got it."""
-    for key in ("textFile", "ocrTextFile"):
-        path = record.get(key)
-        if path and Path(path).is_file():
-            text = Path(path).read_text(encoding="utf-8")
-            if text.strip():
-                return text
-    return ""
-
+from signals import BALANCE, HEADING, INCI, PERCENT, read_text
 
 def score(text):
     """How much this file looks like it states a composition, and what it scored on."""
@@ -105,6 +84,10 @@ def main():
         if item is None:
             unplaced.append(relative)
             continue
+        entry = by_material.setdefault(item["identifier"], {
+            "identifier": item["identifier"], "itemId": item["id"], "itemName": item["name"],
+            "table": item["table"], "candidates": [], "filesSeen": 0})
+        entry["filesSeen"] += 1
         text = read_text(extracted.get(document["path"], {}))
         if not text:
             unreadable.append(relative)
@@ -112,9 +95,6 @@ def main():
         points, signals = score(text)
         if points < args.floor:
             continue
-        entry = by_material.setdefault(item["identifier"], {
-            "identifier": item["identifier"], "itemId": item["id"], "itemName": item["name"],
-            "table": item["table"], "candidates": []})
         entry["candidates"].append({
             "sha": document["sha"], "fileName": document["name"], "relativePath": relative,
             "folder": document.get("folder", ""), "score": points, "signals": signals,
@@ -143,7 +123,8 @@ def main():
     print(f"{len(out['materials'])} material(s) with a candidate, {total} candidate(s) shortlisted")
     empty = [m["identifier"] for m in out["materials"] if not m["candidates"]]
     if empty:
-        print(f"  {len(empty)} material(s) shortlisted nothing: {', '.join(empty[:8])}")
+        print(f"  {len(empty)} material(s) have files but none reads like a composition: "
+              f"{', '.join(empty[:8])}{' ...' if len(empty) > 8 else ''}")
     if unplaced:
         print(f"  {len(unplaced)} file(s) reach no live item - the branch rules, not this pass")
     if unreadable:

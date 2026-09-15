@@ -12,7 +12,9 @@ A recut names one material and the file its composition should have come from:
     }
 
 It rewrites that material's task to hold the named file alone and clears the old answer, so the next
-wave re-reads it. The rows still come from a sub agent and are still held against the document, because
+wave re-reads it. The shortlist itself is left as it was, so the workbook can still show every file the
+run considered for the material somebody disagreed about - which is the material whose record is worth
+the most. The rows still come from a sub agent and are still held against the document, because
 a row typed into a file by hand is a row nothing checks - which is the failure this whole run is built
 to prevent.
 
@@ -41,9 +43,6 @@ def main():
 
     manifest = load(session / "READINGS.json")
     tasks = {task["identifier"]: task for task in manifest["tasks"]}
-    candidates = load(session / "CANDIDATES.json")
-    materials = {m["identifier"]: m for m in candidates["materials"]}
-
     applied, problems = [], []
     for recut_path in args.recuts:
         recut = load(recut_path)
@@ -70,20 +69,11 @@ def main():
             body["files"] = match
             body["recut"] = {"sourceFile": wanted, "why": recut.get("why", "")}
             applied.append(f"{identifier}: {wanted}")
-            # The shortlist is what the collector checks the answer against, so it has to agree with the
-            # task or the forced file comes back as one the material was never shown.
-            shown = materials.get(identifier)
-            if shown:
-                shown["candidates"] = [c for c in shown["candidates"]
-                                       if c["sha"] == match[0]["sha"]] or shown["candidates"]
 
         task_file.write_text(json.dumps(body, indent=2, ensure_ascii=False), encoding="utf-8")
         answer = Path(task["output"])
         if answer.is_file():
             answer.unlink()
-
-    (session / "CANDIDATES.json").write_text(json.dumps(candidates, indent=2, ensure_ascii=False),
-                                             encoding="utf-8")
 
     for line in applied:
         print(f"  {line}")

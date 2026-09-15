@@ -31,7 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import codes
 import verbatim
-from score_composition import read_text
+from signals import read_text
 
 
 def load(path):
@@ -56,7 +56,7 @@ def number(value):
         return None
 
 
-def verify(rows, text, shapes):
+def verify(rows, shapes):
     """Every row the agent returned, tagged with how its quotation held up, and what went wrong."""
     checked, failures = [], []
     for raw in rows or []:
@@ -69,16 +69,16 @@ def verify(rows, text, shapes):
             failures.append(f"{name!r}: the quoted line is not in the document")
         if cas and not codes.cas_ok(cas):
             failures.append(f"{name!r}: CAS {cas} fails its check digit")
-        elif cas and cas not in text:
+        elif cas and verbatim.check(cas, shapes) == "ABSENT":
             failures.append(f"{name!r}: CAS {cas} is not printed in the document")
         if ec and not codes.ec_ok(ec):
             failures.append(f"{name!r}: EC {ec} fails its check digit")
-        elif ec and ec not in text:
+        elif ec and verbatim.check(ec, shapes) == "ABSENT":
             failures.append(f"{name!r}: EC {ec} is not printed in the document")
         checked.append({
             "ingredient": name, "cas": cas, "ec": ec,
             "min": number(raw.get("min")), "max": number(raw.get("max")),
-            "statedAs": (raw.get("statedAs") or "").strip(), "quote": quote, "quoteTier": tier,
+            "quote": quote, "quoteTier": tier,
         })
     if not checked:
         failures.append("the answer carries no rows")
@@ -99,6 +99,12 @@ def main():
         by_sha.setdefault(document["sha"], document)
 
     materials, issues, unanswered = [], [], []
+    # A material the shortlist pass found nothing for never gets a task, so it would otherwise reach
+    # neither the page nor the workbook. ADR-0009 promises those are reported by name.
+    for entry in manifest.get("noCandidates") or []:
+        issues.append({"identifier": entry["identifier"], "candidates": [],
+                       "why": "no file under this material reads like a composition "
+                              f"({entry.get('filesSeen', 0)} file(s) looked at)"})
     for task in manifest["tasks"]:
         identifier = task["identifier"]
         answer_path = Path(task["output"])
@@ -129,11 +135,14 @@ def main():
             continue
 
         text = read_text(extracted.get(by_sha.get(chosen["sha"], {}).get("path"), {}))
-        rows, failures = verify(answer.get("rows"), text, verbatim.forms(text))
+        shapes = verbatim.forms(text)
+        rows, failures = verify(answer.get("rows"), shapes)
 
         printed = answer.get("documentDate") or {}
         written = (printed.get("written") or "").strip()
-        if written and written not in text:
+        if not written:
+            failures.append("no date was reported, so nothing says which document this is")
+        elif verbatim.check(written, shapes) == "ABSENT":
             failures.append(f"the date {written!r} is not printed in the document")
 
         if failures:
@@ -152,20 +161,31 @@ def main():
             "documentDate": printed, "why": (answer.get("why") or "").strip(),
             "considered": [{"fileName": c["fileName"], "sha": c["sha"], "folder": c["folder"],
                             "chosen": c["sha"] == chosen["sha"],
-                            "why": rejected.get(c["fileName"], "")}
+                            "why": rejected.get(c["fileName"], ""),
+                            "dates": c.get("dates") or []}
                            for c in shown.values()],
             "rows": rows,
         })
 
     # One content cannot be two compositions. Materials are read one at a time, so the same document
     # chosen by two of them is the one way two answers can disagree about one page.
-    seen, contradictions = {}, []
+    seen, contradictions, blocked = {}, [], set()
     for material in materials:
         signature = tuple((r["ingredient"].casefold(), r["min"], r["max"]) for r in material["rows"])
         first = seen.setdefault(material["sourceSha"], (material["identifier"], signature))
         if first[1] != signature:
             contradictions.append({"sha": material["sourceSha"], "sourceFile": material["sourceFile"],
                                    "materials": [first[0], material["identifier"]]})
+            blocked.update({first[0], material["identifier"]})
+    for identifier in sorted(blocked):
+        material = next(m for m in materials if m["identifier"] == identifier)
+        others = sorted({m["identifier"] for m in materials
+                         if m["sourceSha"] == material["sourceSha"]} - {identifier})
+        issues.append({"identifier": identifier, "sourceFile": material["sourceFile"],
+                       "candidates": [c["fileName"] for c in material["considered"]],
+                       "why": f"{material['sourceFile']} was read differently for "
+                              f"{', '.join(others)} - one document cannot be two compositions"})
+    materials = [m for m in materials if m["identifier"] not in blocked]
 
     out = {"materials": materials, "issues": issues, "contradictions": contradictions,
            "unanswered": unanswered}
