@@ -1,0 +1,89 @@
+"""Find an extraction of this folder somebody has already paid for, and say how much of it it covers.
+
+Usage:
+    python3 reuse_extraction.py <session_dir> <documents_folder> [--adopt <EXTRACTED.json>]
+
+With no --adopt this writes nothing. It walks `.workflow/active/*/` beside the user's working directory,
+opens every EXTRACTED.json it finds, and reports what fraction of the files under <documents_folder>
+each one already holds text for.
+
+Reading a folder of three thousand documents takes about half an hour, and on a machine where
+`upload-documents` has run against the same folder that half hour is already spent. This is what finds
+it - and, as importantly, what measures it: a session covering three quarters of the folder is worse
+than no session at all if the quarter it misses is silently read as materials with no composition.
+
+--adopt copies the named manifest in as this session's EXTRACTED.json and prints the files it does not
+cover, which is what the extraction step should then be given.
+
+The join is on the absolute path. A manifest's own `relativePath` is the bare file name where the
+extractor was handed a list of files rather than a folder, so joining on that silently matches two
+documents of the same name under different materials.
+"""
+
+import argparse
+import json
+from pathlib import Path
+
+
+def covered(manifest_path, wanted):
+    """Which of the wanted paths this manifest already holds usable text for."""
+    try:
+        manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set(), 0
+    hits, records = set(), 0
+    for record in manifest.get("documents") or []:
+        records += 1
+        source = record.get("textFile") or record.get("ocrTextFile")
+        if not source or not Path(source).is_file():
+            continue
+        try:
+            resolved = Path(record["path"]).resolve()
+        except (OSError, KeyError):
+            continue
+        if resolved in wanted:
+            hits.add(resolved)
+    return hits, records
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("session_dir", type=Path)
+    parser.add_argument("documents_folder", type=Path)
+    parser.add_argument("--adopt", type=Path, default=None)
+    parser.add_argument("--workflow-root", type=Path, default=Path(".workflow/active"))
+    args = parser.parse_args()
+
+    folder = args.documents_folder.resolve()
+    wanted = {path.resolve() for path in folder.rglob("*") if path.is_file()}
+    if not wanted:
+        raise SystemExit(f"no files under {folder}")
+
+    if args.adopt:
+        hits, _ = covered(args.adopt, wanted)
+        args.session_dir.mkdir(parents=True, exist_ok=True)
+        (args.session_dir / "EXTRACTED.json").write_text(
+            Path(args.adopt).read_text(encoding="utf-8"), encoding="utf-8")
+        missing = sorted(str(path) for path in wanted - hits)
+        listing = args.session_dir / "STILL_TO_EXTRACT.json"
+        listing.write_text(json.dumps(missing, indent=1), encoding="utf-8")
+        print(f"adopted {args.adopt}")
+        print(f"  {len(hits)} of {len(wanted)} file(s) already have text")
+        print(f"  {len(missing)} still to read -> {listing}")
+        return
+
+    found = sorted(Path(args.workflow_root).glob("*/EXTRACTED.json"))
+    if not found:
+        print(f"no earlier extraction under {args.workflow_root} - this folder has not been read here")
+        return
+    print(f"{len(found)} earlier extraction(s), against {len(wanted)} file(s) in this folder:\n")
+    for manifest_path in found:
+        hits, records = covered(manifest_path, wanted)
+        share = 100.0 * len(hits) / len(wanted)
+        print(f"  {share:5.1f}%  {len(hits)} of {len(wanted)} covered   "
+              f"({records} record(s) in it)   {manifest_path}")
+    print("\nAdopt one with --adopt <path>, which also lists what it does not cover.")
+
+
+if __name__ == "__main__":
+    main()

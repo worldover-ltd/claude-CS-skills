@@ -1,0 +1,114 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Raw material compositions</title>
+<!-- An example of what lib/build_review_page.py writes. The materials are invented and the
+     page images are drawn rather than rendered, so this commits as text. -->
+<style>
+  :root { color-scheme: light; }
+  /* Each card is a screenful, and scrolling settles on whichever one is nearest - the page reads as one
+     composition at a time rather than as a continuous list. */
+  html { scroll-snap-type: y mandatory; }
+  body { margin: 0; padding: 24px; font: 14px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif;
+         color: #17181c; background: #fafaf8; }
+  h1 { font-size: 20px; margin: 0 0 20px; font-weight: 600; }
+  section { background: #fff; border: 1px solid #e3e3df; border-radius: 6px; padding: 16px 18px;
+            margin-bottom: 18px; height: 80vh; box-sizing: border-box; display: flex;
+            flex-direction: column; scroll-snap-align: center; overflow: hidden; }
+  h2 { font-size: 15px; margin: 0 0 12px; font-weight: 600; }
+  /* The columns stretch rather than sitting at the top: a grid item only as tall as its content gives
+     the page image no height to measure itself against, and it renders full size. */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex: 1; min-height: 0; }
+  .left { min-height: 0; overflow-y: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th { text-align: left; font-weight: 600; color: #6b6d75; border-bottom: 1px solid #e3e3df;
+       padding: 5px 8px 5px 0; white-space: nowrap; }
+  td { padding: 5px 8px 5px 0; border-bottom: 1px solid #f0f0ec; vertical-align: top; }
+  td.n, td.c { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  td.c { color: #6b6d75; }
+  .folders { margin: 12px 0 0; font-size: 12px; color: #6b6d75; }
+  .folders span { display: block; }
+  .src { margin: 8px 0 0; font-size: 12px; color: #8a8c94; word-break: break-word; }
+  .right { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .shots { display: flex; gap: 10px; flex: 1; min-height: 0; justify-content: center;
+           align-items: center; }
+  /* The link is not a box: with the anchor in the chain the image measures itself against something of
+     auto height and renders full size. `display: contents` puts the image straight into the flex row,
+     where the two maximums below bound it in both directions. */
+  .shots a { display: contents; }
+  .shots img { max-height: 100%; max-width: 100%; width: auto; height: auto; box-sizing: border-box;
+               border: 1px solid #e3e3df; border-radius: 4px; display: block; }
+  .shots.two img { max-width: calc(50% - 5px); }
+  .none { color: #8a8c94; font-size: 13px; }
+  .issue { color: #9a3412; font-size: 13px; }
+  @media (max-width: 900px) {
+    html { scroll-snap-type: none; }
+    section { height: auto; }
+    .split { grid-template-columns: 1fr; }
+    .shots { flex-wrap: wrap; }
+    .shots img { max-height: none; width: 100%; }
+  }
+</style>
+<h1>Raw material compositions</h1>
+<section>
+  <h2>R289 &middot; Dissolvine GL-47-S</h2>
+  <div class=split>
+    <div class=left>
+      <table>
+        <thead><tr><th>Name</th><th>CAS</th><th>EC</th><th>min %</th><th>max %</th>
+        <th>stated as</th></tr></thead>
+        <tbody>
+          <tr><td>Tetrasodium Glutamate Diacetate</td><td class=c>51981-21-6</td>
+              <td class=c>257-573-7</td><td class=n>47.5</td><td class=n>48.0</td>
+              <td class=c>47.5-48.0</td></tr>
+          <tr><td>Trisodium NTA</td><td class=c>5064-31-3</td><td class=c>225-768-6</td>
+              <td class=n>0.04</td><td class=n>0.08</td><td class=c>0.04-0.08</td></tr>
+          <tr><td>Aqua</td><td class=c>7732-18-5</td><td class=c>231-791-2</td>
+              <td class=n></td><td class=n></td><td class=c>balance</td></tr>
+        </tbody>
+      </table>
+      <p class=folders><span>R289 - Dissolvine GL-47-S</span></p>
+    </div>
+    <div class=right>
+      <div class="shots"><a href="#"><img src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20595%20842%22%3E%3Crect%20width%3D%22595%22%20height%3D%22842%22%20fill%3D%22%23fff%22/%3E%3Ctext%20x%3D%2240%22%20y%3D%2270%22%20font-family%3D%22Helvetica%22%20font-size%3D%2217%22%20font-weight%3D%22bold%22%20fill%3D%22%2317181c%22%3EDissolvine%20GL-47-S%20%E2%80%94%20Technical%20Data%20Sheet%3C/text%3E%3Cline%20x1%3D%2240%22%20y1%3D%2290%22%20x2%3D%22555%22%20y2%3D%2290%22%20stroke%3D%22%23c9c9c4%22/%3E%3Ctext%20x%3D%2240%22%20y%3D%22120%22%20font-family%3D%22Helvetica%22%20font-size%3D%2214%22%20font-weight%3D%22bold%22%20fill%3D%22%2317181c%22%3ESECTION%203%20Composition%20/%20information%20on%20ingredients%3C/text%3E%3Ctext%20x%3D%2240%22%20y%3D%22150%22%20font-family%3D%22Helvetica%22%20font-size%3D%2213%22%20fill%3D%22%236b6d75%22%3EINCI%20name%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20CAS%20%20%20%20%20%20%20%20%20%20EC%20%20%20%20%20%20%20%20%20%20%20%25%20%20%20%20%20%20%20%20%20%20Function%3C/text%3E%3Ctext%20x%3D%2240%22%20y%3D%22176%22%20font-family%3D%22Helvetica%22%20font-size%3D%2213%22%20fill%3D%22%2317181c%22%3ETetrasodium%20glutamate%20diacetate%2051981-21-6%20%20%20257-573-7%20%20%20%2047.5-48.0%20%20Chelating%20agent%3C/text%3E%3Ctext%20x%3D%2240%22%20y%3D%22202%22%20font-family%3D%22Helvetica%22%20font-size%3D%2213%22%20fill%3D%22%2317181c%22%3ETrisodium%20NTA%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%205064-31-3%20%20%20%20225-768-6%20%20%20%200.04-0.08%20%20By-product%3C/text%3E%3Ctext%20x%3D%2240%22%20y%3D%22228%22%20font-family%3D%22Helvetica%22%20font-size%3D%2213%22%20fill%3D%22%2317181c%22%3EAqua/water%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%207732-18-5%20%20%20%20231-791-2%20%20%20%20balance%20%20%20%20Solvent%3C/text%3E%3Ctext%20x%3D%2240%22%20y%3D%22254%22%20font-family%3D%22Helvetica%22%20font-size%3D%2213%22%20fill%3D%22%2317181c%22%3E%3C/text%3E%3Ctext%20x%3D%2240%22%20y%3D%22280%22%20font-family%3D%22Helvetica%22%20font-size%3D%2213%22%20fill%3D%22%2317181c%22%3EIssue%20Date%3A%2014/03/2023%20%20%20%20%20%20%20%20%20%20Print%20Date%3A%2002/09/2024%3C/text%3E%3Cline%20x1%3D%2240%22%20y1%3D%22790%22%20x2%3D%22555%22%20y2%3D%22790%22%20stroke%3D%22%23e3e3df%22/%3E%3Ctext%20x%3D%2240%22%20y%3D%22812%22%20font-family%3D%22Helvetica%22%20font-size%3D%2211%22%20fill%3D%22%238a8c94%22%3EPage%202%20of%209%3C/text%3E%3C/svg%3E" alt=""></a></div>
+      <p class=src>Dissolvine GL-47-S - TDS.pdf &middot; 14/03/2023 (issue)</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>R584 &middot; Kester Wax K-BWR</h2>
+  <div class=split>
+    <div class=left>
+      <table>
+        <thead><tr><th>Name</th><th>CAS</th><th>EC</th><th>min %</th><th>max %</th>
+        <th>stated as</th></tr></thead>
+        <tbody>
+          <tr><td>Behenyl Behenate</td><td class=c>17671-27-1</td><td class=c>241-646-5</td>
+              <td class=n>40</td><td class=n>70</td><td class=c>40-70</td></tr>
+          <tr><td>Polyhydroxystearic Acid</td><td class=c>58128-22-6</td><td class=c>500-140-7</td>
+              <td class=n>10</td><td class=n>40</td><td class=c>10-40</td></tr>
+          <tr><td>Euphorbia Cerifera (Candelilla) Wax</td><td class=c>8006-44-8</td>
+              <td class=c>232-347-0</td><td class=n>1</td><td class=n>10</td><td class=c>1-10</td></tr>
+        </tbody>
+      </table>
+      <p class=folders><span>R584 - Kester Wax K-BWR (25kgs)</span></p>
+    </div>
+    <div class=right>
+      <div class="shots"><a href="#"><img src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20595%20842%22%3E%3Crect%20width%3D%22595%22%20height%3D%22842%22%20fill%3D%22%23fff%22/%3E%3Ctext%20x%3D%2240%22%20y%3D%2270%22%20font-family%3D%22Helvetica%22%20font-size%3D%2217%22%20font-weight%3D%22bold%22%20fill%3D%22%2317181c%22%3EKester%20Wax%20K-BWR%20%E2%80%94%20Safety%20Data%20Sheet%3C/text%3E%3Cline%20x1%3D%2240%22%20y1%3D%2290%22%20x2%3D%22555%22%20y2%3D%2290%22%20stroke%3D%22%23c9c9c4%22/%3E%3Ctext%20x%3D%2240%22%20y%3D%22120%22%20font-family%3D%22Helvetica%22%20font-size%3D%2214%22%20font-weight%3D%22bold%22%20fill%3D%22%2317181c%22%3ESECTION%203%20Composition%20/%20information%20on%20ingredients%3C/text%3E%3Ctext%20x%3D%2240%22%20y%3D%22150%22%20font-family%3D%22Helvetica%22%20font-size%3D%2213%22%20fill%3D%22%236b6d75%22%3EComponent%20%20%20%20%20%20%20%20%20%20%20%20INCI%20Name%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%25%20%20%20%20%20%20%20CAS%20%20%20%20%20%20%20%20%20%20EINECS%3C/text%3E%3Ctext%20x%3D%2240%22%20y%3D%22176%22%20font-family%3D%22Helvetica%22%20font-size%3D%2213%22%20fill%3D%22%2317181c%22%3EBehenyl%20Behenate%20%20%20%20%20Behenyl%20Behenate%20%20%20%20%20%20%20%2040-70%20%20%2017671-27-1%20%20%20241-646-5%3C/text%3E%3Ctext%20x%3D%2240%22%20y%3D%22202%22%20font-family%3D%22Helvetica%22%20font-size%3D%2213%22%20fill%3D%22%2317181c%22%3EPolyhydroxystearic%20%20%20Polyhydroxystearic%20Acid%2010-40%20%20%2058128-22-6%20%20%20500-140-7%3C/text%3E%3Ctext%20x%3D%2240%22%20y%3D%22228%22%20font-family%3D%22Helvetica%22%20font-size%3D%2213%22%20fill%3D%22%2317181c%22%3ECandelilla%20Wax%20%20%20%20%20%20%20Euphorbia%20Cerifera%20Wax%20%201-10%20%20%20%208006-44-8%20%20%20%20232-347-0%3C/text%3E%3Ctext%20x%3D%2240%22%20y%3D%22254%22%20font-family%3D%22Helvetica%22%20font-size%3D%2213%22%20fill%3D%22%2317181c%22%3E%3C/text%3E%3Ctext%20x%3D%2240%22%20y%3D%22280%22%20font-family%3D%22Helvetica%22%20font-size%3D%2213%22%20fill%3D%22%2317181c%22%3EPreparation%20Date%3A%20August%2025%2C%202023%20%20%20%20Revision%203%2C%20Version%201%3C/text%3E%3Cline%20x1%3D%2240%22%20y1%3D%22790%22%20x2%3D%22555%22%20y2%3D%22790%22%20stroke%3D%22%23e3e3df%22/%3E%3Ctext%20x%3D%2240%22%20y%3D%22812%22%20font-family%3D%22Helvetica%22%20font-size%3D%2211%22%20fill%3D%22%238a8c94%22%3EPage%202%20of%209%3C/text%3E%3C/svg%3E" alt=""></a></div>
+      <p class=src>Kester Wax K-BWR R3 V1.pdf &middot; August 25, 2023 (issue)</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>R117</h2>
+  <div class=split>
+    <div class=left>
+      <p class=issue>no file in the shortlist states a composition &mdash; the SDS gives ethanol and a
+      balance line, and the denaturant table defines the grade rather than this product</p>
+      <p class=folders><span>X002B_LACTANOL NS F4_NEW ZEALAND_EN.pdf</span>
+      <span>Lactanol Denaturant Table v2.pdf</span></p>
+    </div>
+    <div class=right><div class=shots><p class=none>no composition document</p></div></div>
+  </div>
+</section>

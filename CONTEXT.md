@@ -118,3 +118,44 @@ addressed to. `{WORLDMAKER}` is the chat inside the customer's app, which reads 
 publishes cards. `{LOCAL}` is Claude Code on the user's own machine, which reads their files and builds
 the workbook. Neither can do the other's half, and this plugin is `{LOCAL}`.
 _Avoid_: side, environment (an *environment* is Development, Staging or Production)
+
+# Composition
+
+The language of `extract-composition-from-documents`: reading a customer's supplier documents to say
+what each of their raw materials is made of.
+
+## Language
+
+**Composition**:
+What one raw material is made of, as one document states it: a list of ingredients with a quantity
+against each. A composition belongs to a *material*, never to a document - two suppliers' sheets for one
+material are two candidates for its composition, not two compositions.
+_Avoid_: formulation (that is a finished product), recipe, breakdown
+
+**Single source**:
+The one document a composition is taken from, whole. A composition assembled from several documents is
+not a composition with better coverage; it is a different kind of answer, one nothing downstream can
+check. See `docs/adr/0009`.
+_Avoid_: primary (the *role* on the reference sheet is `PRIMARY`; the concept is the single source)
+
+**Candidate**:
+One file that might state a material's composition, shortlisted by score before any agent reads it. A
+candidate is a guess about a file; what it turns out to be is the sub agent's answer.
+_Avoid_: match, hit, source (a *single source* is the one that won)
+
+**Balance row**:
+An ingredient a document gives no figure for, stating only that it makes up the rest - `Balance`,
+`to 100%`, `q.s.`. Carried with its words and no numbers, because the complement of the other rows is
+arithmetic the document does not contain.
+_Avoid_: remainder, filler, the rest
+
+**Recut**:
+A recorded decision that the run picked the wrong document for one material, naming the file it should
+have used. Replayed by script rather than typed into the workbook, so a rebuild reproduces it.
+_Avoid_: override, correction, fix
+
+**Kind of date**:
+What a document calls the date it prints - issue, revision, review, print, edition. Which one a document
+carries decides whether it is newer than another: a print date is when somebody pressed print, and a
+review that changed nothing does not age a document forward.
+_Avoid_: timestamp, version (a *version* is a label the supplier chose, not a date)

@@ -19,6 +19,9 @@ ITEM_COLUMNS = ("table", "id", "identifier", "name", "template", "archived")
 
 # What a run leaves in the customer's folder, and so what a later run must not read back as a document.
 OUR_OWN_FILES = {"document_upload_workbook.xlsx"}
+# The compositions workbook carries the date it was written, so it is matched on its prefix rather than
+# on a fixed name - and a folder read twice holds one file per run rather than one file.
+OUR_OWN_PREFIXES = ("raw_material_compositions",)
 
 
 class ExportError(Exception):
@@ -267,6 +270,30 @@ def identifier_for(relative_path, rule):
             return None, f"only {len(folders)} folder level(s) above this file, rule wants level {level}"
         return folders[level - 1].strip(), None
 
+    if kind == "constant":
+        value = (rule.get("value") or "").strip()
+        if not value:
+            return None, "constant rule carries no value"
+        return value, None
+
+    if kind == "folderLevelPattern":
+        level = rule.get("level")
+        pattern = rule.get("pattern")
+        if not isinstance(level, int) or level < 1:
+            return None, f"folderLevelPattern needs a level of 1 or more, got {level!r}"
+        if level > len(folders):
+            return None, f"only {len(folders)} folder level(s) above this file, rule wants level {level}"
+        if not pattern:
+            return None, "folderLevelPattern rule carries no pattern"
+        folder = folders[level - 1].strip()
+        try:
+            found = re.search(pattern, folder)
+        except re.error as error:
+            return None, f"pattern {pattern!r} is not valid regex: {error}"
+        if not found:
+            return None, f"pattern {pattern!r} does not match folder {folder!r}"
+        return (found.group(1) if found.groups() else found.group(0)).strip(), None
+
     if kind == "fileName":
         pattern = rule.get("pattern")
         if not pattern:
@@ -289,7 +316,8 @@ def is_our_own(relative_path):
     next run walks. Left alone it would be hashed, converted and sent to a classifier as though the
     customer had filed it.
     """
-    return relative_path.rsplit("/", 1)[-1].casefold() in OUR_OWN_FILES
+    name = relative_path.rsplit("/", 1)[-1].casefold()
+    return name in OUR_OWN_FILES or name.startswith(OUR_OWN_PREFIXES)
 
 
 def excluded_paths(session_dir):
