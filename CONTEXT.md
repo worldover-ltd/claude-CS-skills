@@ -107,6 +107,14 @@ is. A pass asks nobody anything and settles nothing a person must confirm — th
 from a *step*, which has a "Done when" and usually a question in it.
 _Avoid_: phase, job, stage
 
+**Conversation**:
+The chat a run happens in. It launches *passes*, reports what they print and asks what a *step* owes the
+user — and it holds no state of its own, because everything a run knows is written under
+`.workflow/active/${sessionId}/`. That is what makes it disposable at a *step* boundary, and why a data
+file read into it is a data file paid for on every turn after. See `docs/adr/0010`.
+_Avoid_: context (that is what the conversation holds, not the thing itself), session (that is
+`${sessionId}`, which outlives any one conversation), agent, thread
+
 **Journey**:
 Everything between a customer's raw files and their data live in Production, across as many *steps*,
 screens and machines as it takes. A *step* belongs to one journey; a run covers part of one.

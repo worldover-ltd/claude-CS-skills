@@ -41,6 +41,16 @@ Monitor({ command: "<the pass> 2>&1 1>>'.workflow/active/${sessionId}/logs/<pass
           description: "reading the documents", persistent: true })
 ```
 
+### The conversation
+
+What this run holds in the chat, as against what it writes down, is
+`${CLAUDE_PLUGIN_ROOT}/docs/THE_CONVERSATION.md`, read at the start of a run alongside `PRESENTING.md`.
+Its three rules bind every step below: never read a data file into the conversation, compact at the heavy
+boundaries — steps 5 and 7 say where — and leave the judgement to the steps that ask the user something.
+
+Its figures were measured on a run of `upload-documents`, which reads the same folders with the same
+passes. Nothing here has been measured on a composition run yet.
+
 ### The single source
 
 **A composition comes from one document that states the whole thing.** Where no single document states
@@ -173,6 +183,10 @@ the adopted one with just the leftovers:
 Done when `EXTRACTED.json` answers for every file in `DOCUMENTS.json` — which the merge reports, as the
 count of files in the folder that now have a record.
 
+**Then ask the user to compact** — `/compact`, which clears what has been said and keeps a summary.
+Tell them it is safe here in their words: the documents are read and saved, and the next step works from
+what was saved.
+
 # Step 6 — shortlist what could be a composition
 
 ```sh
@@ -205,6 +219,9 @@ Each returns the one file it picked, the rows it transcribed, the line each row 
 the document prints with the label the document used.
 
 Done when every task under `readings/` has an answer under `read/`.
+
+**Then ask the user to compact.** This is the widest fan-out in the run. Every answer is saved, and the
+next step checks those answers against the documents rather than against anything said here.
 
 # Step 8 — check every value against the document
 
