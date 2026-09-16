@@ -16,9 +16,10 @@ Then restart Claude Code (or reload plugins) when prompted.
 
 ### `customer-service-skills`
 
-Three skills. `upload-documents` builds the workbook a Worldmaker app agent migrates from,
-`extract-document-text` reads the document files it has to classify, and `ask-worldover` answers the
-question of what to do next.
+Four skills. `upload-documents` builds the workbook a Worldmaker app agent migrates from,
+`extract-document-text` reads the document files it has to classify,
+`extract-composition-from-documents` says what each raw material is made of, and `ask-worldover` answers
+the question of what to do next.
 
 #### `upload-documents`
 
@@ -105,6 +106,26 @@ its content ended up.
 It is a tool rather than a procedure: it converts what it is given and reports what it did, and what to do
 with the result is the caller's.
 
+#### `extract-composition-from-documents`
+
+Reads a folder of supplier documents and says what each raw material is made of — ingredient names,
+percentages, CAS and EC numbers — against the items that already exist in the app.
+
+Invoke it by running `/extract-composition-from-documents`, or ask Claude what a customer's raw
+materials are made of.
+
+Every composition comes from **one** document that states the whole thing; where no single document
+does, the material is reported as having none rather than assembled from several.
+[ADR-0009](docs/adr/0009-a-composition-comes-from-one-document.md) records what that rule costs and why
+it is worth it. Every value a sub agent returns is held against the document it named — the quoted line
+against the text, each CAS and EC against its own check digit and against being printed on the page.
+
+The run's state is JSON, and the Excel file is written only once you have approved the review page it
+builds: one card per material, the table beside the page of the PDF it was read from.
+
+Needs [`uv`](https://docs.astral.sh/uv/) to render those pages and Python with `openpyxl` for the
+workbook.
+
 #### `ask-worldover`
 
 Answers "how do I do this?" and "what happens next?" for getting a customer's data and documents into
@@ -133,6 +154,8 @@ plugins/
     vendor/                                      # MIT copies of third-party skills, used as references
     skills/upload-documents/                     # SKILL.md + references/ + lib/
     skills/extract-document-text/                # SKILL.md + lib/extract_documents.py
+    skills/extract-composition-from-documents/   # SKILL.md + references/ + lib/ + assets/
+    agents/                                      # sub agents the skills fan out to
     skills/ask-worldover/                        # SKILL.md + docs/ (published from Worldmaker)
 ```
 

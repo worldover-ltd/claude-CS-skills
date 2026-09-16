@@ -1,23 +1,26 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "markitdown[pdf,docx,pptx,xlsx,xls,outlook]",
-#     "pypdfium2",
-#     "pillow",
+#     "markitdown[pdf,docx,pptx,xlsx,xls,outlook]==0.1.7",
+#     "pdfplumber==0.11.10",
+#     "pypdfium2==5.13.0",
+#     "pillow==12.3.0",
 # ]
 # ///
 """Turn document files into Markdown, and render the ones with no text layer to page images.
 
 Usage:
     uv run extract_documents.py <folder-or-json> <out_dir> [--scans first|all|none|<pages>]
-        [--max-chars 0] [--ocr] [--scale 2.0] [--max-pages 40] [--enhance] [--jobs 4] [--force]
+        [--max-chars 0] [--ocr] [--scale 2.0] [--max-pages 40] [--table-pages 40] [--enhance]
+        [--jobs 4] [--force]
+        [--no-tables]
 
 <folder-or-json> is a folder to walk, or a JSON file holding either a list of paths or
 {"documents": [{"path": ...}]}.
 
 Writes text to <out_dir>/extracted/<slug>.md, page images to <out_dir>/extracted/<slug>/page_NNN.png,
-OCR text to <out_dir>/extracted/<slug>.ocr.md, and one record per input file to
-<out_dir>/EXTRACTED.json.
+OCR text to <out_dir>/extracted/<slug>.ocr.md, a PDF's tables to <out_dir>/extracted/<slug>.tables.md,
+and one record per input file to <out_dir>/EXTRACTED.json.
 
 `--max-chars` caps what a reader is pointed at, keeping the head and the tail of the text: a document
 names itself at the top, and carries its form number and revision block at the bottom. The full
@@ -41,6 +44,7 @@ import warnings
 from pathlib import Path
 
 import progress
+import tables
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tif", ".tiff"}
 UNSUPPORTED_SUFFIXES = {".doc", ".rtf", ".odt", ".ods", ".odp", ".pages", ".numbers", ".key", ".7z", ".rar"}
@@ -74,12 +78,14 @@ OCR_INSTALL = f"uv run --with {OCR_PACKAGE} extract_documents.py <target> <out_d
 # What OCR is worth running over: a file whose text is a picture. `text` is left alone, because a text
 # layer the document itself carries beats a second guess at the same page.
 OCR_KINDS = {"image", "image-only", "sparse-text"}
+OCR_MADE_FROM = re.compile(r"^<!-- pages: (\d+) -->")
 KEPT = "Everything read so far is kept, so re-running picks up where it stopped."
 
 # A page carrying fewer letters than this is a picture of a page rather than a page. Letters rather than
 # characters, because a scan often leaks a handful of bullet glyphs — enough to pass a character count
 # while holding no words at all.
 LETTERS_PER_PAGE_FLOOR = 40
+TABLE_PAGES = 40
 LETTER = re.compile(r"[^\W\d_]", re.UNICODE)
 SAMPLE = 15
 
@@ -100,6 +106,7 @@ MODERN_FOR = {".xls": ".xlsx", ".doc": ".docx", ".ppt": ".pptx"}
 
 # pdfium is not thread-safe, so every call into it goes through one lock.
 PDFIUM_LOCK = threading.Lock()
+PDFPLUMBER_LOCK = threading.Lock()
 LOCAL = threading.local()
 
 
@@ -149,6 +156,86 @@ def note_that(record, text):
     record["note"] = f"{record['note']}; {text}" if record["note"] else text
 
 
+def tables_on_pages(path, limit):
+    """Every table pdfplumber finds in a PDF, keyed by the page it was on, and whether pages were left.
+
+    Serialised on PDFPLUMBER_LOCK. pdfminer.six, underneath, interns literals into process-wide tables
+    and caches CMaps on the class, neither guarded — and pdfplumber declines to claim thread safety. The
+    conversion pool runs `--jobs` of these at once, so this is the same bargain `render_pages` strikes
+    with pdfium.
+    """
+    import pdfplumber
+
+    found = {}
+    with PDFPLUMBER_LOCK:
+        with pdfplumber.open(path) as pdf:
+            total = len(pdf.pages)
+            for number, page in enumerate(pdf.pages[:limit], start=1):
+                rows = page.extract_tables() or []
+                if rows:
+                    found[number] = rows
+    return found, max(0, total - limit)
+
+
+def read_tables(path, record, out_file, force, limit=TABLE_PAGES):
+    """Write a PDF's tables beside its Markdown, and say how many there were.
+
+    Its own file, like OCR's, because the text a document holds decides what `kind` it is: fold tables
+    into the conversion and a scan carrying a wide table stops looking like a scan. The file is written
+    even when it is empty, so a second run knows this document was looked at and does not open it again.
+    """
+    if out_file.exists() and not force:
+        written = out_file.read_text(encoding="utf-8")
+        count = tables.count_in(written)
+        if count:
+            record["tablesFile"] = str(out_file.resolve()).replace("\\", "/")
+            record["tablesFound"] = count
+        return
+    try:
+        found, unread = tables_on_pages(path, limit)
+    except Exception as error:
+        note_that(record, f"tables could not be read ({type(error).__name__})")
+        return
+    written, count = tables.render(found)
+    out_file.write_text(written, encoding="utf-8")
+    if count:
+        record["tablesFile"] = str(out_file.resolve()).replace("\\", "/")
+        record["tablesFound"] = count
+    if unread:
+        note_that(record, f"tables were read from the first {limit} pages; {unread} were not")
+
+
+def skill_version():
+    """The plugin's own version, or None where this is running from somewhere that has no plugin.json."""
+    manifest = Path(__file__).resolve().parents[3] / ".claude-plugin" / "plugin.json"
+    try:
+        return json.loads(manifest.read_text(encoding="utf-8")).get("version")
+    except (OSError, ValueError):
+        return None
+
+
+def produced_by(options):
+    """What read the documents, so a later run can say whether it is looking at its own kind of answer.
+
+    The version is the plugin's, not any library's: it is the number somebody bumps on purpose when the
+    answers change. The flags are the other half of the question — an extraction made with `--scans none`
+    holds no page images however current the version is.
+    """
+    return {
+        "skillVersion": skill_version(),
+        "flags": {
+            "scans": options.scans,
+            "maxChars": options.max_chars,
+            "ocr": OCR_PACKAGE if options.ocr else None,
+            "maxPages": options.max_pages,
+            "scale": options.scale,
+            "enhance": options.enhance,
+            "tables": options.tables,
+            "tablePages": options.table_pages,
+        },
+    }
+
+
 def record_for(path, relative_path, **known):
     """One record's worth of fields, so every way a file can end up answers the same set of questions.
 
@@ -171,6 +258,8 @@ def record_for(path, relative_path, **known):
         "ocrLines": 0,
         "pages": None,
         "pagesRendered": 0,
+        "tablesFile": None,
+        "tablesFound": 0,
         "note": None,
         **known,
     }
@@ -324,6 +413,19 @@ def ocr_record(record, out_dir, options):
     sources = ocr_sources(record)
     if not sources:
         return
+    path = out_dir / f"{slug_for(Path(record['path']))}.ocr.md"
+    if path.is_file() and not options.force:
+        text = path.read_text(encoding="utf-8")
+        # Keyed on what the reading was made from, not only on the file. A run that rendered one page
+        # and a run that rendered twelve write the same name, and reusing the first under the second
+        # would put one page's text behind a manifest stamped `--scans all`.
+        stale = OCR_MADE_FROM.match(text)
+        made_from = int(stale.group(1)) if stale else None
+        if made_from == len(sources):
+            record["ocrTextFile"] = str(path.resolve()).replace("\\", "/")
+            record["ocrChars"] = len(OCR_MADE_FROM.sub("", text).strip())
+            note_that(record, f"{record['ocrChars']} characters of OCR reused from an earlier run")
+            return
     lines, scores = [], []
     for number, source in enumerate(sources, 1):
         try:
@@ -341,8 +443,7 @@ def ocr_record(record, out_dir, options):
         note_that(record, "OCR found no text in the page(s)")
         return
     capped, dropped = cap_text(text, options.max_chars)
-    path = out_dir / f"{slug_for(Path(record['path']))}.ocr.md"
-    path.write_text(capped, encoding="utf-8")
+    path.write_text("\n".join([f"<!-- pages: {len(sources)} -->", capped]), encoding="utf-8")
     record["ocrTextFile"] = str(path.resolve()).replace("\\", "/")
     record["ocrChars"] = len(capped.strip())
     # Recorded, never routed on: no threshold has been measured, and `kind` is a contract other skills
@@ -606,6 +707,9 @@ def extract(path, root, out_dir, options, converted=None):
             record["note"] = "converted, but held no text"
         return record
 
+    if options.tables:
+        read_tables(path, record, out_dir / f"{slug}.tables.md", options.force, options.table_pages)
+
     try:
         pages = page_count(path)
     except Exception as error:
@@ -671,10 +775,14 @@ def main():
                         help="leave .doc, .rtf and OpenDocument files unconverted even where LibreOffice is installed")
     parser.add_argument("--scale", type=float, default=2.0, help="render scale, 1.0 is 72 dpi (default: 2.0)")
     parser.add_argument("--max-pages", type=int, default=40, help="page cap for --scans all (default: 40)")
+    parser.add_argument("--table-pages", type=int, default=TABLE_PAGES,
+                        help=f"pages per PDF searched for tables (default: {TABLE_PAGES})")
     parser.add_argument("--max-px", type=int, default=2000, help="longest side of a rendered page (default: 2000)")
     parser.add_argument("--enhance", action="store_true", help="grayscale, raise contrast and sharpen each render")
     parser.add_argument("--jobs", type=int, default=4, help="files converted at once (default: 4)")
     parser.add_argument("--force", action="store_true", help="re-convert files already extracted")
+    parser.add_argument("--no-tables", dest="tables", action="store_false",
+                        help="skip reading tables out of PDFs")
     options = parser.parse_args()
     options.scan_pages = scan_pages_from(options.scans)
     if options.max_chars and options.max_chars < 200:
@@ -761,6 +869,7 @@ def main():
         counts[record["kind"]] = counts.get(record["kind"], 0) + 1
 
     manifest = {
+        "producedBy": produced_by(options),
         "root": str(root.resolve()).replace("\\", "/") if root else None,
         "extractedDir": str(extracted_dir.resolve()).replace("\\", "/"),
         "scans": options.scans,

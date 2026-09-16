@@ -89,6 +89,7 @@ tool, whose command is the script itself, and each line arrives as it is written
 <out_dir>/extracted/<slug>.md                  one Markdown file per converted document
 <out_dir>/extracted/<slug>.capped.md           the head and tail of it, under --max-chars
 <out_dir>/extracted/<slug>.ocr.md              what OCR read off the pictures, under --ocr
+<out_dir>/extracted/<slug>.tables.md           the tables pdfplumber found in a PDF
 <out_dir>/extracted/<slug>/page_001.png        rendered pages, for scans
 <out_dir>/converted/<slug>.pdf                 legacy Office files LibreOffice turned into PDFs
 ```
@@ -104,6 +105,7 @@ same name in different folders stay separate.
   "maxChars": 0,
   "ocr": null,
   "libreOffice": "C:/Program Files/LibreOffice/program/soffice.exe",
+  "producedBy": { "skillVersion": "0.12.0", "flags": { "scans": "first", "tables": true } },
   "counts": { "text": 104, "image-only": 12, "unsupported": 2 },
   "documents": [
     {
@@ -116,11 +118,25 @@ same name in different folders stay separate.
       "letters": 6180,
       "pages": 4,
       "pagesRendered": 0,
+      "tablesFile": "C:/…/out/extracted/a1b2c3d4_SDS_2026.tables.md",
+      "tablesFound": 3,
       "note": null
     }
   ]
 }
 ```
+
+**Tables are read separately, and written beside the text.** A PDF is opened a second time with
+`pdfplumber`, and whatever tables it finds land in `<slug>.tables.md` as Markdown pipe tables, one heading
+per page. `tablesFile` points at that file and `tablesFound` counts the tables, on any PDF that had one.
+
+Beside rather than inside, because `chars`, `letters` and `kind` are counted on the conversion: fold
+tables into it and a scan carrying a wide table stops looking like a scan. Beside rather than instead,
+because the two finders disagree — over 150 pages carrying composition signals, `pdfplumber` produced a
+table on 92 and MarkItDown on 61, agreeing on 38. A reader gets both. `docs/adr/0011` is the argument.
+
+The file is written even when a PDF has no tables, so a re-run knows it has already looked; `tablesFile`
+stays null in that case. Only the first 40 pages are read, and a document with more says so in its `note`.
 
 `documents` holds one record per input file, sorted by `relativePath`, with `path` verbatim as it was given
 so a caller can join on it. `textFile` and `images` are absolute, which is what the Read tool takes.
@@ -130,7 +146,10 @@ PDF is really text — a scan often leaks a handful of bullet glyphs, enough to 
 holding no words. Both are counted on the **whole** conversion even under `--max-chars`, so a cap never
 changes what a file is judged to be; `charsRead` is what a reader is actually given, and `fullTextFile`
 points at the uncapped text where the two differ. `ocrTextFile`, `ocrChars`, `ocrConfidence` and
-`ocrLines` are filled under `--ocr` and empty otherwise — `ocrConfidence` being the mean of the
+`ocrLines` are filled under `--ocr` and empty otherwise, except that a reading already on disk is reused
+rather than redone: a reused one carries `ocrTextFile` and `ocrChars` but no confidence, because that is
+a property of the recognition rather than of the text, and the `note` says the reading was reused —
+`ocrConfidence` being the mean of the
 recogniser's own per-line scores, which answers *how well* a page was read where `chars` and `letters`
 only answer *how much*. Nothing in this skill routes on it: it is recorded so a caller can ask which
 scans came back badly instead of guessing from length. `pages` is filled for PDFs only; `note` carries
@@ -165,6 +184,7 @@ conversion LibreOffice made possible, or one that only the renderer rescued.
 | `--enhance` | off | grayscale, raise contrast, denoise and sharpen each render — legible on a faxed or photocopied page, and it discards colour, so a stamp or a highlighted row goes with it |
 | `--jobs N` | `4` | files **converted** at once. Rendering ignores it, being serialised by pdfium's own rule |
 | `--force` | off | redo files already converted or rendered |
+| `--no-tables` | off | skip reading tables out of PDFs. The pass opens every PDF a second time, so this is the flag to reach for where nothing downstream reads a table |
 
 ### What it converts
 

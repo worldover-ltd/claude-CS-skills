@@ -52,6 +52,14 @@ it could not catch arrive the same way, which is what keeps silence from reading
 That redirect is `sh` and stays `sh`: a `Monitor` command runs in the Bash environment rather than the
 user's own shell, so it is the one command in this skill that does not have to survive PowerShell.
 
+### The conversation
+
+What this run holds in the chat, as against what it writes down, is
+`${CLAUDE_PLUGIN_ROOT}/docs/THE_CONVERSATION.md`, read at the start of a run alongside `PRESENTING.md`.
+Its three rules bind every step below: start things and talk to the user but look at nothing yourself —
+send a sub agent to read whatever a pass wrote; compact at the heavy boundaries, which steps 6, 7 and 9
+name; and leave the judgement to the steps that ask the user something.
+
 ### The export
 
 Nothing here reads the customer's app. Its own agent does that, through the
@@ -240,11 +248,17 @@ Ask before paying for it:
 <interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/plan_exclusions.py" ".workflow/active/${sessionId}"
 ```
 
-With no rules that prints the candidates and writes nothing: folder names ranked by how many different
-parents they repeat under, so the categories somebody made on purpose come first and an item's own
-folder sinks; and every extension with a count.
+With no rules that prints the candidates and writes nothing, in three lists: folder names that say on
+their face they have been put away — `Archive`, `Oud`, `Superseded`, `Vervallen`, `_old` — then every
+other name ranked by how many different parents it repeats under, so the categories somebody made on
+purpose come first and an item's own folder sinks, and then every extension with a count.
 
-Put those to the user as two short lists with counts and let them pick. Then record the decision:
+The first list exists because the ranking alone cannot see it. One `Archive` at the top of a tree sits
+under a single parent however many thousands of files it holds, so it sorts below every item folder and
+falls off the end of the sample — the shape the ranking finds is `Oud` repeated under three hundred
+item folders, which is a different thing.
+
+Put those to the user with counts and let them pick. Then record the decision:
 
 ```sh
 <interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/plan_exclusions.py" ".workflow/active/${sessionId}" --folders "Oud,Offertes" --extensions "msg,eml"
@@ -329,6 +343,10 @@ user.
 Done when `BATCHES.json` names at least one batch, every document in `DOCUMENTS.json` is either in a batch
 or on the reported exception list, and the user has seen that list.
 
+**Then ask the user to compact** — `/compact`, which clears what has been said and keeps a summary.
+Tell them it is safe here in their words: the reading is finished and saved, and nothing after this needs
+the conversation that produced it.
+
 # Step 7 — group the documents by form
 
 Most of a customer's folder is the same few pieces of paper filled in over and over. A **form** is that
@@ -361,6 +379,9 @@ rules; `docs/adr/0007` says why that went and what it costs. The machinery is st
 value** so its documents are read one at a time. A run writes no such file.
 
 Done when `FORMS.json` holds the forms and `NAMED.json` a title and description for each.
+
+**Then ask the user to compact.** The forms and their names are saved; nothing after this step needs how
+they were arrived at.
 
 # Step 8 — hold the forms up against the app's list
 
@@ -462,6 +483,9 @@ enough for them to say what a document is.
 Done when `CLASSIFICATIONS.json` holds one entry per batched document, every batch has answered or been
 reported as unanswered, `REREAD.json` is empty or its round has been run, and the exception pile has been
 through the user.
+
+**Then ask the user to compact.** This is the longest step in the run and the one that fans out most
+widely. Every answer is saved; nothing after this step needs the conversation that produced it.
 
 # Step 10 — set the answers against each other
 

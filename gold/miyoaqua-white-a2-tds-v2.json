@@ -1,0 +1,11 @@
+{
+  "document": "MiyoAQUA White A2_TDS_v2.pdf",
+  "confirmed": true,
+  "confirmedBy": "read off the page, 2026-09-16",
+  "note": "Three components stated as % wt, summing to 100.0. The page also carries a heavy-metals table, which is not a composition and is deliberately not labelled.",
+  "rows": [
+    { "ingredient": "Titanium Dioxide", "value": "98.6" },
+    { "ingredient": "Sodium Alginate", "value": "1.0" },
+    { "ingredient": "Calcium Chloride", "value": "0.4" }
+  ]
+}

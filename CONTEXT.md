@@ -107,6 +107,14 @@ is. A pass asks nobody anything and settles nothing a person must confirm — th
 from a *step*, which has a "Done when" and usually a question in it.
 _Avoid_: phase, job, stage
 
+**Conversation**:
+The chat a run happens in. It launches *passes*, reports what they print and asks what a *step* owes the
+user — and it holds no state of its own, because everything a run knows is written under
+`.workflow/active/${sessionId}/`. That is what makes it disposable at a *step* boundary, and why a data
+file read into it is a data file paid for on every turn after. See `docs/adr/0010`.
+_Avoid_: context (that is what the conversation holds, not the thing itself), session (that is
+`${sessionId}`, which outlives any one conversation), agent, thread
+
 **Journey**:
 Everything between a customer's raw files and their data live in Production, across as many *steps*,
 screens and machines as it takes. A *step* belongs to one journey; a run covers part of one.
@@ -118,3 +126,68 @@ addressed to. `{WORLDMAKER}` is the chat inside the customer's app, which reads 
 publishes cards. `{LOCAL}` is Claude Code on the user's own machine, which reads their files and builds
 the workbook. Neither can do the other's half, and this plugin is `{LOCAL}`.
 _Avoid_: side, environment (an *environment* is Development, Staging or Production)
+
+# Composition
+
+The language of `extract-composition-from-documents`: reading a customer's supplier documents to say
+what each of their raw materials is made of.
+
+## Language
+
+**Composition**:
+What one raw material is made of, as one document states it: a list of ingredients with a quantity
+against each. A composition belongs to a *material*, never to a document - two suppliers' sheets for one
+material are two candidates for its composition, not two compositions.
+_Avoid_: formulation (that is a finished product), recipe, breakdown
+
+**Single source**:
+The one document a composition is taken from, whole. A composition assembled from several documents is
+not a composition with better coverage; it is a different kind of answer, one nothing downstream can
+check. A *safety data sheet* is never one. See `docs/adr/0009` and `docs/adr/0012`.
+_Avoid_: primary (the *role* on the reference sheet is `PRIMARY`; the concept is the single source)
+
+**Safety data sheet**:
+A supplier's hazard document. Its section 3 names the substances classified above a cut-off, so it can
+be complete and still omit the water — which makes it a *document template* like any other and never a
+*single source*. Its CAS and EC numbers are still used, as reference against a *candidate*.
+_Avoid_: SDS as a bare word when what is meant is the composition it is not being read for
+
+**Material**:
+An *item* on the `raw_materials` table, seen from this skill. The wider plugin says *item*, because it
+also means products; a composition only ever belongs to a raw material, and this is the word for one.
+_Avoid_: ingredient (that is what a material is made of), substance, product
+
+**Candidate**:
+One file that might state a material's composition, shortlisted by score before any agent reads it. A
+candidate is a guess about a file; what it turns out to be is the sub agent's answer.
+_Avoid_: match, hit, source (a *single source* is the one that won)
+
+**Composition reading**:
+One sub agent's answer for one *material*: the *candidate* it picked as the *single source*, and the
+rows it transcribed off it. Distinct from a *reading* in the document-upload sense, which is one
+classification of one `(sha, table)`.
+_Avoid_: reading on its own (it is already taken), extraction, transcription
+
+**Balance row**:
+An ingredient a document gives no figure for, stating only that it makes up the rest - `Balance`,
+`to 100%`, `q.s.`. Carried with its words and no numbers, because the complement of the other rows is
+arithmetic the document does not contain.
+_Avoid_: remainder, filler, the rest
+
+**Withheld row**:
+A row a *composition reading* saw on the page and could not carry, returned with what the page prints
+and why. It reaches no figure and blocks nothing — the row-level counterpart of an *exception*, and
+like one, every one is somebody's next action. A row left out silently is not withheld; it is lost.
+See `docs/adr/0013`.
+_Avoid_: dropped, skipped, failed row
+
+**Recut**:
+A recorded decision that the run picked the wrong document for one material, naming the file it should
+have used. Replayed by script rather than typed into the workbook, so a rebuild reproduces it.
+_Avoid_: override, correction, fix
+
+**Kind of date**:
+What a document calls the date it prints - issue, revision, review, print, edition. Which one a document
+carries decides whether it is newer than another: a print date is when somebody pressed print, and a
+review that changed nothing does not age a document forward.
+_Avoid_: timestamp, version (a *version* is a label the supplier chose, not a date)

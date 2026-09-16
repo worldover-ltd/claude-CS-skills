@@ -1,7 +1,7 @@
 {
   "name": "customer-service-skills",
-  "version": "0.11.0",
-  "description": "Skills for the Customer Service team. Holds upload-documents, which builds the workbook that attaches a folder of documents onto items that already exist in a Worldmaker app, reading each document to decide what kind of document it is; extract-document-text, which converts those document files to Markdown under uv, renders the pages of scanned PDFs that hold no text, and reads those pages with OCR on request; and ask-worldover, which guides a person through getting a customer's data and documents into their Worldmaker app and says which screen and control to use at each step.",
+  "version": "0.12.0",
+  "description": "Skills for the Customer Service team. Holds upload-documents, which builds the workbook that attaches a folder of documents onto items that already exist in a Worldmaker app, reading each document to decide what kind of document it is; extract-document-text, which converts those document files to Markdown under uv, renders the pages of scanned PDFs that hold no text, and reads those pages with OCR on request; extract-composition-from-documents, which reads a folder of supplier documents and says what each raw material is made of, taking every composition from the one document that states it; and ask-worldover, which guides a person through getting a customer's data and documents into their Worldmaker app and says which screen and control to use at each step.",
   "author": {
     "name": "Frederico Correia",
     "email": "frederico.correia@worldover.io"
@@ -20,6 +20,10 @@
     "scans",
     "ocr",
     "guide",
-    "help"
+    "help",
+    "composition",
+    "ingredients",
+    "inci",
+    "raw materials"
   ]
 }
