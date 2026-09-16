@@ -44,6 +44,38 @@ def _cap(manifest_path):
         return 0
 
 
+def skill_version():
+    """The plugin's own version, so a manifest can be held against the skill reading it."""
+    plugin = Path(__file__).resolve().parents[3] / ".claude-plugin" / "plugin.json"
+    try:
+        return json.loads(plugin.read_text(encoding="utf-8")).get("version")
+    except (OSError, ValueError):
+        return None
+
+
+def provenance(manifest, running, want=None):
+    """What to say out loud about an extraction before anybody adopts it, or "" when there is nothing.
+
+    Warns, never refuses. Not every version bump changes what a run writes, and re-reading three
+    thousand documents over a patch release is worse than the thing it guards against. The person
+    adopting knows what changed between two versions; this pass only knows the numbers differ.
+    """
+    stamp = manifest.get("producedBy")
+    if not stamp:
+        return (f"That extraction carries no version — it was made before extractions recorded one, "
+                f"so it is older than {running}.")
+
+    said = []
+    was = stamp.get("skillVersion")
+    if was != running:
+        said.append(f"That extraction was read by version {was}. You are on {running}.")
+    for name, wanted in (want or {}).items():
+        had = (stamp.get("flags") or {}).get(name)
+        if had != wanted:
+            said.append(f"It was read with {name}={had!r}; this run wants {wanted!r}.")
+    return " ".join(said)
+
+
 def covered(manifest_path, wanted):
     """Which of the wanted paths this manifest already holds usable text for."""
     try:
@@ -127,6 +159,13 @@ def main():
         if cap:
             print(f"         capped at {cap} characters a document; the uncapped text is read where "
                   f"the extraction left it beside the manifest")
+        try:
+            manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            manifest = {}
+        said = provenance(manifest, skill_version())
+        if said:
+            print(f"         {said}")
     print("\nAdopt one with --adopt <path>, which also lists what it does not cover.")
 
 

@@ -56,10 +56,50 @@ def read_text(record):
     Lives here rather than in a scoring module because three passes need it and none of them is about
     scoring.
     """
+    return join(*body_and_tables(record))
+
+
+def body_and_tables(record):
+    """The conversion and the tables apart, for a caller that has to treat them differently.
+
+    `read_text` joins them, which is right for scoring and for the haystack a quote is checked against.
+    A pass that takes a *slice* cannot use the joined text: the tables sit past the end of any window
+    anchored on a heading, so slicing the join silently drops them.
+    """
+    body = ""
     for key in ("fullTextFile", "textFile", "ocrTextFile"):
         path = record.get(key)
         if path and Path(path).is_file():
             text = Path(path).read_text(encoding="utf-8")
             if text.strip():
-                return text
-    return ""
+                body = text
+                break
+    tables = ""
+    path = record.get("tablesFile")
+    if path and Path(path).is_file():
+        tables = Path(path).read_text(encoding="utf-8").strip()
+    return body, tables
+
+
+def join(body, tables):
+    """The conversion, then whatever tables were read out of the same PDF, labelled as tables.
+
+    Appended rather than substituted, because the two finders disagree: over 150 pages carrying
+    composition signals, pdfplumber produced a table on 92 and MarkItDown on 61, agreeing on 38. A
+    composition flattened out of one may survive in the other, so a reader is given both.
+
+    Joined here rather than in the pass that builds a task, because this same text is the haystack every
+    quoted value is checked against. Hand a sub agent a table it can quote and check its quote somewhere
+    else, and a correct row fails as unverifiable.
+    """
+    if not tables.strip():
+        return body
+    if not body.strip():
+        return tables
+    heading = "# Tables read from this document"
+    return "\n\n".join([body.rstrip(), heading, tables])
+
+
+def with_tables(body, record):
+    """`join`, for a caller that has the body and the record rather than the tables."""
+    return join(body, body_and_tables(record)[1])

@@ -33,9 +33,16 @@ holds; append a wide table to the text and a scan stops looking like a scan, sil
   process-wide tables and caches CMaps on the class, neither guarded, and `pdfplumber` declines to claim
   thread safety. So the conversion pool gains a second choke point, alongside the one pdfium already
   imposes on rendering.
-- **Nothing reads the tables yet.** They are extracted and nobody consumes `tablesFile`; the *composition
-  reading* is still taken from `textFile`. Until a reader points at them this costs time and buys nothing,
-  which is the honest state of it.
+- **Three passes read them, through one seam.** `signals.read_text` joins the tables onto the conversion,
+  so the shortlist that scores a candidate, the task a sub agent is given and the haystack `verbatim.py`
+  checks quotes against all see the same text. Joining anywhere else would fail a correct row: a value
+  quoted off a table, checked against text that never held it, is unverifiable.
+- **A pass that slices cannot slice the join.** `plan_readings` cuts a window around the composition, and
+  the tables sit past the end of any window anchored on a heading. So it windows the body and joins the
+  tables on afterwards. Before that, whether a reader saw the tables depended on whether `window` fell
+  back to keeping the tail — present on one document and absent on the next.
+- **Whether this makes readings better is unmeasured.** The gold set has one confirmed label and it scores
+  the same either way.
 - **A table wrongly kept is noise; a table wrongly dropped is a composition nobody can see.** So the shape
   is not judged: whatever the extractor found is rendered, and only what cannot be written as a table at
   all — under two filled rows, under two columns — is discarded. That asymmetry is deliberate and will

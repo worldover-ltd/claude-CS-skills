@@ -1,10 +1,10 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "markitdown[pdf,docx,pptx,xlsx,xls,outlook]",
-#     "pdfplumber",
-#     "pypdfium2",
-#     "pillow",
+#     "markitdown[pdf,docx,pptx,xlsx,xls,outlook]==0.1.7",
+#     "pdfplumber==0.11.10",
+#     "pypdfium2==5.13.0",
+#     "pillow==12.3.0",
 # ]
 # ///
 """Turn document files into Markdown, and render the ones with no text layer to page images.
@@ -77,6 +77,7 @@ OCR_INSTALL = f"uv run --with {OCR_PACKAGE} extract_documents.py <target> <out_d
 # What OCR is worth running over: a file whose text is a picture. `text` is left alone, because a text
 # layer the document itself carries beats a second guess at the same page.
 OCR_KINDS = {"image", "image-only", "sparse-text"}
+OCR_MADE_FROM = re.compile(r"^<!-- pages: (\d+) -->")
 KEPT = "Everything read so far is kept, so re-running picks up where it stopped."
 
 # A page carrying fewer letters than this is a picture of a page rather than a page. Letters rather than
@@ -201,6 +202,36 @@ def read_tables(path, record, out_file, force):
         record["tablesFound"] = count
     if unread:
         note_that(record, f"tables were read from the first {TABLE_PAGES} pages; {unread} were not")
+
+
+def skill_version():
+    """The plugin's own version, or None where this is running from somewhere that has no plugin.json."""
+    manifest = Path(__file__).resolve().parents[3] / ".claude-plugin" / "plugin.json"
+    try:
+        return json.loads(manifest.read_text(encoding="utf-8")).get("version")
+    except (OSError, ValueError):
+        return None
+
+
+def produced_by(options):
+    """What read the documents, so a later run can say whether it is looking at its own kind of answer.
+
+    The version is the plugin's, not any library's: it is the number somebody bumps on purpose when the
+    answers change. The flags are the other half of the question — an extraction made with `--scans none`
+    holds no page images however current the version is.
+    """
+    return {
+        "skillVersion": skill_version(),
+        "flags": {
+            "scans": options.scans,
+            "maxChars": options.max_chars,
+            "ocr": OCR_PACKAGE if options.ocr else None,
+            "maxPages": options.max_pages,
+            "scale": options.scale,
+            "enhance": options.enhance,
+            "tables": options.tables,
+        },
+    }
 
 
 def record_for(path, relative_path, **known):
@@ -380,6 +411,19 @@ def ocr_record(record, out_dir, options):
     sources = ocr_sources(record)
     if not sources:
         return
+    path = out_dir / f"{slug_for(Path(record['path']))}.ocr.md"
+    if path.is_file() and not options.force:
+        text = path.read_text(encoding="utf-8")
+        # Keyed on what the reading was made from, not only on the file. A run that rendered one page
+        # and a run that rendered twelve write the same name, and reusing the first under the second
+        # would put one page's text behind a manifest stamped `--scans all`.
+        stale = OCR_MADE_FROM.match(text)
+        made_from = int(stale.group(1)) if stale else None
+        if made_from == len(sources):
+            record["ocrTextFile"] = str(path.resolve()).replace("\\", "/")
+            record["ocrChars"] = len(OCR_MADE_FROM.sub("", text).strip())
+            note_that(record, f"{record['ocrChars']} characters of OCR reused from an earlier run")
+            return
     lines, scores = [], []
     for number, source in enumerate(sources, 1):
         try:
@@ -397,8 +441,7 @@ def ocr_record(record, out_dir, options):
         note_that(record, "OCR found no text in the page(s)")
         return
     capped, dropped = cap_text(text, options.max_chars)
-    path = out_dir / f"{slug_for(Path(record['path']))}.ocr.md"
-    path.write_text(capped, encoding="utf-8")
+    path.write_text("\n".join([f"<!-- pages: {len(sources)} -->", capped]), encoding="utf-8")
     record["ocrTextFile"] = str(path.resolve()).replace("\\", "/")
     record["ocrChars"] = len(capped.strip())
     # Recorded, never routed on: no threshold has been measured, and `kind` is a contract other skills
@@ -822,6 +865,7 @@ def main():
         counts[record["kind"]] = counts.get(record["kind"], 0) + 1
 
     manifest = {
+        "producedBy": produced_by(options),
         "root": str(root.resolve()).replace("\\", "/") if root else None,
         "extractedDir": str(extracted_dir.resolve()).replace("\\", "/"),
         "scans": options.scans,

@@ -70,6 +70,18 @@ One material can have four suppliers' folders under it — a code's folder holdi
 INCI is normal. The most recent qualifying document wins whichever supplier it came from, and the review
 page lists every folder so the choice is visible rather than silent.
 
+### Measuring a change
+
+`lib/gold.py` says whether a change to extraction helped, against hand-made labels in `gold/` at the repo
+root. A label is what a person read off the page — an ingredient and the figure beside it — and the score
+asks whether that pair can still be found *together*. Nothing calls a model, so two runs are comparable.
+
+```sh
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/extract-composition-from-documents/lib/gold.py" gold --extracted ".workflow/active/${sessionId}/EXTRACTED.json" --label "<what changed>" --history gold/HISTORY.jsonl
+```
+
+Not part of a customer run. It is how somebody changing the extraction finds out what they did.
+
 ### Process
 
 # Step 1 — preflight
@@ -147,6 +159,11 @@ Where the user wants one, adopt it:
 ```
 
 That copies it in and writes `STILL_TO_EXTRACT.json`, the list of paths Step 5 then reads.
+
+Reuse also says which version of the skill read it — *"That extraction was read by version 0.11.0. You
+are on 0.12.0."* It warns rather than refusing: not every version changes what a run writes, and the
+user knows what changed between two of them. A manifest with no version was made before extractions
+carried one.
 
 Done when the user has seen what was found and said whether to reuse it, and `--adopt` has run where
 they said yes.

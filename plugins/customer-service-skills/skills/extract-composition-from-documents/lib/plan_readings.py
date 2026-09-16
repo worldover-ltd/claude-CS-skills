@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import codes
-from signals import CODE_OR_PERCENT, HEADING, file_key, read_text
+from signals import CODE_OR_PERCENT, HEADING, body_and_tables, file_key, join
 
 
 def window(text, size):
@@ -75,13 +75,14 @@ def main():
         files = []
         for candidate in material["candidates"]:
             document = by_path.get(candidate["relativePath"], {})
-            text = read_text(extracted.get(file_key(document.get("path")), {}))
+            body, tables = body_and_tables(extracted.get(file_key(document.get("path")), {}))
+            text = join(body, tables)
             files.append({
                 "sha": candidate["sha"], "fileName": candidate["fileName"],
                 "sourceFolder": candidate["folder"], "signals": candidate["signals"],
                 "datesPrinted": candidate["dates"],
                 "casNumbers": codes.find(text, "cas"), "ecNumbers": codes.find(text, "ec"),
-                "text": window(text, args.window),
+                "text": join(window(body, args.window), tables),
             })
         code = re.sub(r"[^A-Za-z0-9_.-]", "_", material["identifier"])
         task = {
