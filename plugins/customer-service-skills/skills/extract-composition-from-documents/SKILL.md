@@ -45,8 +45,9 @@ Monitor({ command: "<the pass> 2>&1 1>>'.workflow/active/${sessionId}/logs/<pass
 
 What this run holds in the chat, as against what it writes down, is
 `${CLAUDE_PLUGIN_ROOT}/docs/THE_CONVERSATION.md`, read at the start of a run alongside `PRESENTING.md`.
-Its three rules bind every step below: never read a data file into the conversation, compact at the heavy
-boundaries — steps 5 and 7 say where — and leave the judgement to the steps that ask the user something.
+Its three rules bind every step below: start things and talk to the user but look at nothing yourself —
+send a sub agent to read whatever a pass wrote; compact at the heavy boundaries, which steps 5 and 7 name;
+and leave the judgement to the steps that ask the user something.
 
 Its figures were measured on a run of `upload-documents`, which reads the same folders with the same
 passes. Nothing here has been measured on a composition run yet.

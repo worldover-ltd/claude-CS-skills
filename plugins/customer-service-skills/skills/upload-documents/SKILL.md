@@ -56,8 +56,9 @@ user's own shell, so it is the one command in this skill that does not have to s
 
 What this run holds in the chat, as against what it writes down, is
 `${CLAUDE_PLUGIN_ROOT}/docs/THE_CONVERSATION.md`, read at the start of a run alongside `PRESENTING.md`.
-Its three rules bind every step below: never read a data file into the conversation, compact at the heavy
-boundaries — steps 6, 7 and 9 say where — and leave the judgement to the steps that ask the user something.
+Its three rules bind every step below: start things and talk to the user but look at nothing yourself —
+send a sub agent to read whatever a pass wrote; compact at the heavy boundaries, which steps 6, 7 and 9
+name; and leave the judgement to the steps that ask the user something.
 
 ### The export
 
