@@ -298,11 +298,28 @@ A model asked for the CAS of glycerin answers 56-81-5 whether or not the page sa
 invented to make a table sum to 100 reads exactly like a transcribed one. This pass is the only thing
 that tells them apart.
 
+A CAS cell naming several numbers is a document being precise about isomers, not a mistyped one. Each
+number in the cell has to pass its own check digit and be printed on the page; the cell is not required
+to be a single number. Getting that wrong cost one material fourteen of its eighteen rows.
+
+**A material can carry a composition and still be incomplete, and that is what a clean answer hides.**
+A reading hands back the rows it saw and could not carry, with what stopped it on each one. Nothing
+about those was checked, so they carry no figure anywhere — they are the run saying it saw more than it
+could take, and `docs/adr/0013` is why that had to be made free to say.
+
+Read them out the way the run says everything else: the material, what is missing, and that looking at
+the page is what settles it. They reach the workbook and the review card on their own, so nothing
+depends on being mentioned here.
+
+What this does **not** catch is a reading that carried four rows off a page of eighteen and said nothing
+— which is what happened, and was found only because somebody asked. Counting the rows a page appears to
+hold was tried and cut: it flagged all eight verified compositions on the run it was measured against.
+
 Writes `COMPOSITIONS.json` — the run's state, and what the next two steps are both built from. Excel
 comes at Step 10, on the user's word.
 
-Done when `COMPOSITIONS.json` exists and the materials it could not verify have been read out to the
-user with what stopped each one.
+Done when `COMPOSITIONS.json` exists, the materials it could not verify have been read out to the user
+with what stopped each one, and any withheld rows or short answers have been named.
 
 # Step 9 — put the page in front of them
 

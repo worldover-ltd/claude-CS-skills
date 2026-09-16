@@ -174,6 +174,13 @@ An ingredient a document gives no figure for, stating only that it makes up the 
 arithmetic the document does not contain.
 _Avoid_: remainder, filler, the rest
 
+**Withheld row**:
+A row a *composition reading* saw on the page and could not carry, returned with what the page prints
+and why. It reaches no figure and blocks nothing — the row-level counterpart of an *exception*, and
+like one, every one is somebody's next action. A row left out silently is not withheld; it is lost.
+See `docs/adr/0013`.
+_Avoid_: dropped, skipped, failed row
+
 **Recut**:
 A recorded decision that the run picked the wrong document for one material, naming the file it should
 have used. Replayed by script rather than typed into the workbook, so a rebuild reproduces it.

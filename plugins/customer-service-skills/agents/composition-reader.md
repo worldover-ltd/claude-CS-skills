@@ -74,13 +74,29 @@ as old as the content it restates, and saying so is what stops a stale sheet out
   "rejected": [
     { "fileName": "Product dossier 2022.pdf",
       "why": "hazard bands, not a composition — names methanol, omits water" }
+  ],
+  "withheld": [
+    { "ingredient": "Citral",
+      "asPrinted": "Citral   5392-40-5   the column did not survive the conversion",
+      "why": "the percentage column is empty on every row of this page after the third" }
   ]
 }
 ```
 
+`withheld` is every row the document prints that you could not carry. It reaches no figure anywhere and
+blocks nothing, so use it freely — an omitted row is invisible, and a withheld one is somebody's next
+action. Leave it out entirely when you carried everything.
+
+Copy a CAS cell as the document prints it, several numbers and all: `5989-27-5; 138-86-3; 7705-14-8` is
+one cell and is checked as one. Do not choose between them, and do not withhold a row over them.
+
 Fill `min` and `max` only where the document gives figures. A balance line — `balance`, `to 100%`,
 `q.s.` — states no figure, so both stay `null` and the quoted line carries the word. Computing the
 complement from the other rows is arithmetic the document does not contain.
+
+A single figure under `Target`, `Nominal` or `Typical` **is** a figure: put it in both `min` and `max`.
+A form printing `Target (W %)` beside empty `Min` and `Max` columns is stating the formulation, not a
+specification's range.
 
 Where the whole material has no composition document, `rows` is empty and `sourceSha` is `null`.
 

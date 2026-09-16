@@ -33,6 +33,7 @@ import pypdfium2
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import owed
 from signals import ELSEWHERE, HEADING
 
 
@@ -121,6 +122,8 @@ STYLE = """
   .shots.two img { max-width: calc(50% - 5px); }
   .none { color: #8a8c94; font-size: 13px; }
   .issue { color: #9a3412; font-size: 13px; }
+  .withheld { color: #9a3412; font-size: 13px; margin: 2px 0 0 18px; padding: 0; }
+  .withheld em { color: #b91c1c; font-style: normal; }
   @media (max-width: 900px) {
     html { scroll-snap-type: none; }
     section { height: auto; }
@@ -168,6 +171,14 @@ def main():
             for r in material["rows"])
         folders = "".join(f"<span>{cell(folder)}</span>"
                           for folder in material.get("sourceFolders") or [])
+        # Beneath the table rather than in it: these carry no figure anybody checked, and a reader
+        # skimming the card has to tell at a glance which rows are the composition.
+        still_owed = owed.owed_on(material)
+        outstanding = "".join(
+            f"<li>{cell(name) + ' &mdash; ' if name else ''}{cell(why)}</li>" for name, why in still_owed)
+        if outstanding:
+            outstanding = (f"<p class=issue>Still to look at:</p>"
+                           f"<ul class=withheld>{outstanding}</ul>")
         shots = "".join(f'<a href="{i}" target="_blank"><img src="{i}" alt=""></a>' for i in images) \
             or f"<p class=none>{cell(note) or 'no source page'}</p>"
         printed = material.get("documentDate") or {}
@@ -181,6 +192,7 @@ def main():
         <thead><tr><th>Name</th><th>CAS</th><th>EC</th><th>min %</th><th>max %</th></tr></thead>
         <tbody>{rows}</tbody>
       </table>
+      {outstanding}
       <p class=folders>{folders}</p>
     </div>
     <div class=right>

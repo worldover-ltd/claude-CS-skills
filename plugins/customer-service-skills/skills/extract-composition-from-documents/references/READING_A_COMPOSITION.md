@@ -46,6 +46,7 @@ These are not, however much they look like one:
   dossier can carry the same table under its own cover, and that one is yours to refuse.
 - a **specification**. `Assay 47.4% min` is a limit the batch must meet, not a statement of what is in
   the drum beside it.
+
 - a **certificate of analysis**. What one batch measured.
 - a **grade definition**. A table saying what "F4" means — ethanol denatured with 0.25% TBA — describes
   the grade, not this drum. The material's own SDS named six possible denaturants and capped them
@@ -54,6 +55,12 @@ These are not, however much they look like one:
 
 The agent decides which of these it is holding. That is the judgement it is there for: the shortlist is
 built by a script scoring words, and the words are nearly identical across all of them.
+
+**But a figure under `Target`, `Nominal` or `Typical` is still a figure.** What makes a specification a
+specification is the range a batch must fall inside, not the word above the column. A form printing
+`Target (W %)` beside empty `Min` and `Max` columns is stating the formulation — one said so on its own
+page, *"Total target contents of the components should sum up to 100%"* — and two rows came back with no
+percentage at all because that heading read as specification language.
 
 ## Which one, where several qualify
 
@@ -69,6 +76,23 @@ The most recent — but recency is a property of the **content**, not of the sta
 So the agent returns the date *and its kind*, and `plan_readings.py` puts every date the file prints in
 front of it with the label the document used. Ranking on the largest number on the page picks the wrong
 document in both cases above.
+
+## Rows you cannot carry
+
+**Transcribe every row the table prints.** A row you are unsure of is still a row. Leaving one out is
+the only mistake here that nothing downstream can see: the rows that remain still look like a
+composition and still sum near enough to 100, and on one real material four of eighteen rows came back
+and nobody knew until a person went looking.
+
+Where a row genuinely cannot be carried, put it in `withheld` with what the page prints and why. A
+withheld row reaches no figure anywhere and blocks nothing — it is how the run says out loud that it
+saw more than it could take, and it costs you nothing to use.
+
+What it is *not* for: a row you simply doubt. Two things that used to look uncarryable are now ordinary.
+A CAS column naming several numbers — `5989-27-5; 138-86-3; 7705-14-8` — is a document being precise
+about isomers, so copy the cell as printed. A figure under `Target` is a figure. Withhold when the page
+itself defeats you: a column that did not survive the conversion, a row split across a page break, two
+tables you cannot tell apart.
 
 **A grade is not a supplier.** Where two files state full compositions for what looks like the same
 substance, check them against the material's own name before ranking them by date. `Ethanol NS F4` and

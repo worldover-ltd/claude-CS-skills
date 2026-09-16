@@ -19,6 +19,13 @@ reads exactly like one that was transcribed. Holding each value against the text
 
 Blocking the whole material rather than the offending row is deliberate: a composition with one row
 quietly dropped still looks like a composition, and sums close enough to 100 that nobody asks.
+
+That severity has a cost, and the cost is silence. A reader facing a row it cannot quite carry learns
+the cheapest safe move is to leave it out, and an answer with rows missing is indistinguishable from a
+complete one. So it can hand the row back instead, in `withheld`, which reaches no figure and blocks
+nothing - none of the checks above is relaxed to make room for it. `docs/adr/0013` is the argument, and
+records what was tried and cut: counting the rows a page appears to hold flagged all eight verified
+compositions on the run it was measured against.
 """
 
 import argparse
@@ -33,7 +40,6 @@ import codes
 import dates as dates_module
 import verbatim
 from signals import file_key, read_text
-
 
 def load(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
@@ -70,6 +76,37 @@ def date_is_printed(written, in_document, shapes):
     return bool(resolved) and resolved in {entry["iso"] for entry in in_document if entry["iso"]}
 
 
+def withheld_from(answer, shapes):
+    """The rows the reader saw and could not carry, each held against the document but never refused.
+
+    A withheld row carries no value anywhere: not to the composition, not to the workbook's figures.
+    So nothing it says can be wrong in the way a carried row can, and refusing one would only teach a
+    reader to go back to saying nothing - which is the silence this exists to break.
+
+    The line it names is still checked, and the answer recorded rather than acted on. A reader
+    inventing rows it claims it could not carry should be exactly as visible as one inventing rows it
+    did.
+    """
+    out = []
+    said = answer.get("withheld")
+    # A shape check, because this field is new and a reader will get it wrong. Every other malformed
+    # answer costs one material; iterating a dict here would hand `raw.get` a string and take the whole
+    # collection down with it.
+    if not isinstance(said, list):
+        return out
+    for raw in said:
+        if not isinstance(raw, dict):
+            continue
+        printed = (raw.get("asPrinted") or "").strip()
+        out.append({
+            "ingredient": (raw.get("ingredient") or "").strip(),
+            "asPrinted": printed,
+            "why": (raw.get("why") or "").strip(),
+            "inDocument": bool(printed) and verbatim.check(printed, shapes) != "ABSENT",
+        })
+    return out
+
+
 def verify(rows, shapes):
     """Every row the agent returned, tagged with how its quotation held up, and what went wrong."""
     checked, failures = [], []
@@ -81,14 +118,22 @@ def verify(rows, shapes):
         ec = (raw.get("ec") or "").strip()
         if tier == "ABSENT":
             failures.append(f"{name!r}: the quoted line is not in the document")
-        if cas and not codes.cas_ok(cas):
-            failures.append(f"{name!r}: CAS {cas} fails its check digit")
-        elif cas and verbatim.check(cas, shapes) == "ABSENT":
-            failures.append(f"{name!r}: CAS {cas} is not printed in the document")
-        if ec and not codes.ec_ok(ec):
-            failures.append(f"{name!r}: EC {ec} fails its check digit")
-        elif ec and verbatim.check(ec, shapes) == "ABSENT":
-            failures.append(f"{name!r}: EC {ec} is not printed in the document")
+        # Asked of every code in the cell rather than of the cell. A fragrance prints the isomers it
+        # may contain against one name, so `5989-27-5; 138-86-3; 7705-14-8` is the document being
+        # precise - and asking `cas_ok` of the whole string called it a mistyped number and blocked
+        # the material over it. Each number still has to pass, and still has to be on the page.
+        for kind, value in (("CAS", cas), ("EC", ec)):
+            if not value:
+                continue
+            if not codes.cell_ok(value, kind.lower()):
+                failures.append(f"{name!r}: {kind} {value} fails its check digit")
+                continue
+            # Every code in the cell, of either kind. A cell reading `5989-27-5 / EC 231-791-2` puts
+            # two numbers on the sheet and the column's own kind answers for one of them.
+            missing = [code for _, code in codes.everything_in(value)
+                       if verbatim.check(code, shapes) == "ABSENT"]
+            if missing:
+                failures.append(f"{name!r}: {kind} {', '.join(missing)} is not printed in the document")
         checked.append({
             "ingredient": name, "cas": cas, "ec": ec,
             "min": number(raw.get("min")), "max": number(raw.get("max")),
@@ -172,6 +217,7 @@ def main():
         text = read_text(extracted.get(file_key(by_sha.get(chosen["sha"], {}).get("path")), {}))
         shapes = verbatim.forms(text)
         rows, failures = verify(answer.get("rows"), shapes)
+        withheld = withheld_from(answer, shapes)
 
         printed = answer.get("documentDate") or {}
         written = (printed.get("written") or "").strip()
@@ -212,6 +258,7 @@ def main():
                               "dates": s.get("dates") or []}
                              for s in candidates[identifier].get("sheets") or []],
             "rows": rows,
+            "withheld": withheld,
         })
 
     # One content cannot be two compositions. Materials are read one at a time, so the same document

@@ -21,12 +21,17 @@ the file it used cannot answer it, and that is the question a person asks first.
 
 import argparse
 import json
+import sys
 from datetime import date
 from pathlib import Path
 
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import owed
 
 HEAD = PatternFill("solid", fgColor="1F3864")
 TITLE = Font(bold=True, color="FFFFFF")
@@ -95,6 +100,17 @@ def main():
                "; ".join(issue.get("candidates") or []), issue["why"])
               for issue in sorted(state["issues"], key=lambda i: i["identifier"])]
 
+    # A material can carry a composition and still owe somebody a look. These sit on the issues tab
+    # beside the materials that carry nothing, because the action is the same: read the page. The
+    # ingredient goes in the last column with the reason - the third is "files considered", and a row
+    # is not a file.
+    incomplete = 0
+    for material in sorted(materials, key=lambda m: m["identifier"]):
+        for name, why in owed.owed_on(material):
+            issues.append((material["identifier"], material["sourceFile"], "",
+                           f"{name}: {why}" if name else why))
+        incomplete += bool(owed.owed_on(material))
+
     wb = openpyxl.Workbook()
     sheet(wb, "Composition",
           ["code", "raw material", "ingredient", "CAS", "EC", "min %", "max %",
@@ -117,7 +133,9 @@ def main():
     wb.save(out)
 
     print(f"{len(composition)} ingredient row(s) across {len(materials)} material(s)")
-    print(f"  {len(references)} reference row(s), {len(issues)} material(s) with issues")
+    print(f"  {len(references)} reference row(s), {len(state['issues'])} material(s) carrying nothing")
+    if incomplete:
+        print(f"  {incomplete} material(s) carry a composition and still owe somebody a look")
     if state.get("contradictions"):
         print(f"  {len(state['contradictions'])} document(s) read two different ways - see "
               f"COMPOSITIONS.json")
