@@ -16,16 +16,18 @@ REPO = Path(__file__).resolve().parent.parent
 SKILL = REPO / "plugins/customer-service-skills/skills/extract-composition-from-documents"
 LIB = SKILL / "lib"
 
-COMPOSITION = """SAFETY DATA SHEET
-Dissolvine GL-47-S
+# A supplier's own statement, not a safety data sheet. The distinction is the whole of `looks_like_sds`
+# and it decides whether this file may be a source at all: an SDS section 3 lists what is classified,
+# so it can be complete and correct and still omit the water.
+COMPOSITION = """Dissolvine GL-47-S
+Composition breakdown
 Issue Date: 14/03/2023   Print Date: 02/09/2024
 
-SECTION 3 Composition / information on ingredients
 INCI name                        CAS         EC          Concentration   Function
 Tetrasodium glutamate diacetate  51981-21-6  257-573-7   47.5-48.0       Chelating agent
 Aqua/water                       7732-18-5   231-791-2   balance         Solvent
 
-SECTION 11 Toxicological information
+Stability
 Tetrasodium glutamate diacetate is not classified.
 """
 
@@ -310,21 +312,36 @@ class VerificationTest(unittest.TestCase):
         self.assertIn("another material's", state["issues"][0]["why"])
 
     def test_a_recut_narrows_the_task_but_keeps_the_record_of_what_was_considered(self):
+        self.session.add("R289 - Dissolvine", "statement.pdf", COMPOSITION.replace("47.5-48.0", "46.0"))
+        self.session.close()
+        self.session.run("score_composition.py")
+        self.session.run("plan_readings.py")
         self.session.answer("R289", good_answer(self.sha))
         self.collect()
         before = len(self.session.read("CANDIDATES.json")["materials"][0]["candidates"])
         recut = self.session.root / "recut_R289.json"
-        recut.write_text(json.dumps({"identifier": "R289", "sourceFile": "SDS.pdf",
-                                     "why": "the newer sheet"}), encoding="utf-8")
+        recut.write_text(json.dumps({"identifier": "R289", "sourceFile": "statement.pdf",
+                                     "why": "the newer statement"}), encoding="utf-8")
         self.session.run("apply_recut.py", str(recut))
         task = json.loads((self.session.root / "readings" / "R289.json").read_text(encoding="utf-8"))
-        self.assertEqual([f["fileName"] for f in task["files"]], ["SDS.pdf"])
+        self.assertEqual([f["fileName"] for f in task["files"]], ["statement.pdf"])
         self.assertFalse((self.session.root / "read" / "R289.json").is_file(),
                          "the old answer has to go, or the collector carries it unchanged")
         self.assertEqual(len(self.session.read("CANDIDATES.json")["materials"][0]["candidates"]),
                          before,
                          "the shortlist is the record of what was considered, and a recut is exactly "
                          "when somebody wants to see it")
+
+    def test_a_recut_onto_a_safety_data_sheet_is_refused_in_those_words(self):
+        """The likeliest wrong recut there is: the folder holds six sheets and one statement."""
+        self.session.answer("R289", good_answer(self.sha))
+        self.collect()
+        recut = self.session.root / "recut_R289.json"
+        recut.write_text(json.dumps({"identifier": "R289", "sourceFile": "SDS.pdf",
+                                     "why": "the newer sheet"}), encoding="utf-8")
+        self.assertIn("safety data sheet", self.session.run("apply_recut.py", str(recut)))
+        task = json.loads((self.session.root / "readings" / "R289.json").read_text(encoding="utf-8"))
+        self.assertEqual([f["fileName"] for f in task["files"]], ["TDS.pdf"])
 
 
 class DateLabelTest(unittest.TestCase):
@@ -546,12 +563,15 @@ class WorkbookTest(unittest.TestCase):
         import openpyxl
         sheet = openpyxl.load_workbook(
             folder / "RAW_MATERIAL_COMPOSITIONS 2026-09-15.xlsx")["Reference Documents"]
-        rows = {sheet.cell(n, 2).value: (sheet.cell(n, 4).value, sheet.cell(n, 5).value)
+        rows = {sheet.cell(n, 2).value: (sheet.cell(n, 4).value, sheet.cell(n, 5).value,
+                                         sheet.cell(n, 7).value)
                 for n in range(2, sheet.max_row + 1)}
         self.assertEqual(rows["TDS.pdf"][0], "PRIMARY")
         self.assertEqual(rows["SDS.pdf"][0], "considered")
         self.assertTrue(rows["SDS.pdf"][1],
                         "a loser with no date cannot show that it was the older document")
+        self.assertIn("safety data sheet", rows["SDS.pdf"][2],
+                      "a sheet nobody weighed still has to say why it was never in the running")
 
 
 if __name__ == "__main__":

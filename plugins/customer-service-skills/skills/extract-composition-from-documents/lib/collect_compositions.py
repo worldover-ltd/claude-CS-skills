@@ -117,9 +117,17 @@ def main():
     # A material the shortlist pass found nothing for never gets a task, so it would otherwise reach
     # neither the page nor the workbook. ADR-0009 promises those are reported by name.
     for entry in manifest.get("noCandidates") or []:
+        sheets = entry.get("sheetsOnly") or []
+        if sheets:
+            # Distinct from an empty folder, and the user acts on it differently: the supplier has
+            # been asked for a sheet and never for a composition, so there is somebody to ask.
+            why = (f"the only documents here are safety data sheets ({len(sheets)} of them), which "
+                   "state hazards rather than the whole composition")
+        else:
+            why = ("no file under this material reads like a composition "
+                   f"({entry.get('filesSeen', 0)} file(s) looked at)")
         issues.append({"identifier": entry["identifier"], "candidates": [],
-                       "why": "no file under this material reads like a composition "
-                              f"({entry.get('filesSeen', 0)} file(s) looked at)"})
+                       "safetyDataSheets": sheets, "why": why})
     for task in manifest["tasks"]:
         identifier = task["identifier"]
         answer_path = Path(task["output"])
@@ -190,11 +198,19 @@ def main():
             "sourcePath": chosen["relativePath"], "sourceFolder": chosen["folder"],
             "sourceFolders": candidates[identifier].get("folders", []),
             "documentDate": printed, "why": (answer.get("why") or "").strip(),
+            # The sheets sit here too, though no agent ever weighed them. A person looking at this
+            # material wants to know the folder held six documents and why four of them were never
+            # in the running, and their absence would read as the run not having seen them.
             "considered": [{"fileName": c["fileName"], "sha": c["sha"], "folder": c["folder"],
                             "chosen": c["sha"] == chosen["sha"],
                             "why": rejected.get(c["fileName"], ""),
                             "dates": c.get("dates") or []}
-                           for c in shown.values()],
+                           for c in shown.values()]
+                          + [{"fileName": s["fileName"], "sha": s["sha"], "folder": s["folder"],
+                              "chosen": False,
+                              "why": "a safety data sheet - states hazards, not the whole composition",
+                              "dates": s.get("dates") or []}
+                             for s in candidates[identifier].get("sheets") or []],
             "rows": rows,
         })
 

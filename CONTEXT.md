@@ -143,8 +143,14 @@ _Avoid_: formulation (that is a finished product), recipe, breakdown
 **Single source**:
 The one document a composition is taken from, whole. A composition assembled from several documents is
 not a composition with better coverage; it is a different kind of answer, one nothing downstream can
-check. See `docs/adr/0009`.
+check. A *safety data sheet* is never one. See `docs/adr/0009` and `docs/adr/0012`.
 _Avoid_: primary (the *role* on the reference sheet is `PRIMARY`; the concept is the single source)
+
+**Safety data sheet**:
+A supplier's hazard document. Its section 3 names the substances classified above a cut-off, so it can
+be complete and still omit the water — which makes it a *document template* like any other and never a
+*single source*. Its CAS and EC numbers are still used, as reference against a *candidate*.
+_Avoid_: SDS as a bare word when what is meant is the composition it is not being read for
 
 **Material**:
 An *item* on the `raw_materials` table, seen from this skill. The wider plugin says *item*, because it

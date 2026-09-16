@@ -11,7 +11,8 @@
 
 Usage:
     uv run extract_documents.py <folder-or-json> <out_dir> [--scans first|all|none|<pages>]
-        [--max-chars 0] [--ocr] [--scale 2.0] [--max-pages 40] [--enhance] [--jobs 4] [--force]
+        [--max-chars 0] [--ocr] [--scale 2.0] [--max-pages 40] [--table-pages 40] [--enhance]
+        [--jobs 4] [--force]
         [--no-tables]
 
 <folder-or-json> is a folder to walk, or a JSON file holding either a list of paths or
@@ -176,7 +177,7 @@ def tables_on_pages(path, limit):
     return found, max(0, total - limit)
 
 
-def read_tables(path, record, out_file, force):
+def read_tables(path, record, out_file, force, limit=TABLE_PAGES):
     """Write a PDF's tables beside its Markdown, and say how many there were.
 
     Its own file, like OCR's, because the text a document holds decides what `kind` it is: fold tables
@@ -191,7 +192,7 @@ def read_tables(path, record, out_file, force):
             record["tablesFound"] = count
         return
     try:
-        found, unread = tables_on_pages(path, TABLE_PAGES)
+        found, unread = tables_on_pages(path, limit)
     except Exception as error:
         note_that(record, f"tables could not be read ({type(error).__name__})")
         return
@@ -201,7 +202,7 @@ def read_tables(path, record, out_file, force):
         record["tablesFile"] = str(out_file.resolve()).replace("\\", "/")
         record["tablesFound"] = count
     if unread:
-        note_that(record, f"tables were read from the first {TABLE_PAGES} pages; {unread} were not")
+        note_that(record, f"tables were read from the first {limit} pages; {unread} were not")
 
 
 def skill_version():
@@ -230,6 +231,7 @@ def produced_by(options):
             "scale": options.scale,
             "enhance": options.enhance,
             "tables": options.tables,
+            "tablePages": options.table_pages,
         },
     }
 
@@ -706,7 +708,7 @@ def extract(path, root, out_dir, options, converted=None):
         return record
 
     if options.tables:
-        read_tables(path, record, out_dir / f"{slug}.tables.md", options.force)
+        read_tables(path, record, out_dir / f"{slug}.tables.md", options.force, options.table_pages)
 
     try:
         pages = page_count(path)
@@ -773,6 +775,8 @@ def main():
                         help="leave .doc, .rtf and OpenDocument files unconverted even where LibreOffice is installed")
     parser.add_argument("--scale", type=float, default=2.0, help="render scale, 1.0 is 72 dpi (default: 2.0)")
     parser.add_argument("--max-pages", type=int, default=40, help="page cap for --scans all (default: 40)")
+    parser.add_argument("--table-pages", type=int, default=TABLE_PAGES,
+                        help=f"pages per PDF searched for tables (default: {TABLE_PAGES})")
     parser.add_argument("--max-px", type=int, default=2000, help="longest side of a rendered page (default: 2000)")
     parser.add_argument("--enhance", action="store_true", help="grayscale, raise contrast and sharpen each render")
     parser.add_argument("--jobs", type=int, default=4, help="files converted at once (default: 4)")

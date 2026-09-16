@@ -16,6 +16,18 @@ only thing that can tell a composition from a hazard band that resembles one.
 
 The cull is deliberately loose. A file wrongly shortlisted costs an agent a few hundred tokens; a file
 wrongly culled is a composition nobody ever sees, and the run reports that material as having none.
+
+A safety data sheet is the one exception, and it is culled hard. Its section 3 is a hazard disclosure:
+under CLP it names the substances classified above their cut-off, so a sheet can be complete and
+correct and still omit the water and every other ingredient that carries no classification. The scoring
+above cannot tell that from a composition - `\\bsection\\s*3\\b` and `information on ingredients` are
+literally the sheet's own headings, so it scores highest of anything in the folder. On this customer's
+files there are 4,342 sheets against 680 composition statements, and 2,010 of 2,962 materials have a
+sheet and no statement, so the shortlist fills with them and the answers look complete.
+
+Left out as a source, kept as a register: the sheets are recorded per material and their CAS and EC
+numbers travel to the reader as reference, because the regulation makes a sheet print an identifier
+against every substance it names.
 """
 
 import argparse
@@ -30,7 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "upload-documents" 
 import codes
 import dates as dates_module
 import item_index
-from signals import BALANCE, HEADING, INCI, PERCENT, file_key, read_text
+from signals import BALANCE, HEADING, INCI, PERCENT, file_key, looks_like_sds, read_text
 
 def score(text):
     """How much this file looks like it states a composition, and what it scored on."""
@@ -86,11 +98,20 @@ def main():
             continue
         entry = by_material.setdefault(item["identifier"], {
             "identifier": item["identifier"], "itemId": item["id"], "itemName": item["name"],
-            "table": item["table"], "candidates": [], "filesSeen": 0})
+            "table": item["table"], "candidates": [], "sheets": [], "filesSeen": 0})
         entry["filesSeen"] += 1
         text = read_text(extracted.get(file_key(document["path"]), {}))
         if not text:
             unreadable.append(relative)
+            continue
+        if looks_like_sds(text, document["name"]):
+            # Never a candidate, never dropped either. Its codes go to the reader as reference, and a
+            # material whose folder holds nothing else is owed that reason by name rather than the
+            # bare "no file reads like a composition" every other empty folder gets.
+            entry["sheets"].append({
+                "sha": document["sha"], "fileName": document["name"], "relativePath": relative,
+                "folder": document.get("folder", ""), "dates": dates_module.find(text, limit=12),
+            })
             continue
         points, signals = score(text)
         if points < args.floor:
@@ -111,7 +132,13 @@ def main():
             seen.add(candidate["sha"])
             unique.append(candidate)
         entry["candidates"] = unique[:args.shortlist]
-        entry["folders"] = sorted({c["folder"] for c in unique if c["folder"]})
+        seen, sheets = set(), []
+        for sheet in sorted(entry["sheets"], key=lambda s: s["fileName"]):
+            if sheet["sha"] not in seen:
+                seen.add(sheet["sha"])
+                sheets.append(sheet)
+        entry["sheets"] = sheets
+        entry["folders"] = sorted({c["folder"] for c in unique + sheets if c["folder"]})
 
     out = {"materials": [by_material[key] for key in sorted(by_material)],
            "unplacedFiles": sorted(unplaced), "unreadableFiles": sorted(unreadable),
@@ -125,6 +152,13 @@ def main():
     if empty:
         print(f"  {len(empty)} material(s) have files but none reads like a composition: "
               f"{', '.join(empty[:8])}{' ...' if len(empty) > 8 else ''}")
+    sheets = sum(len(m["sheets"]) for m in out["materials"])
+    sheet_only = [m["identifier"] for m in out["materials"] if m["sheets"] and not m["candidates"]]
+    if sheets:
+        print(f"  {sheets} safety data sheet(s) left out as a source, their codes kept as reference")
+    if sheet_only:
+        print(f"  {len(sheet_only)} material(s) have nothing but safety data sheets: "
+              f"{', '.join(sheet_only[:8])}{' ...' if len(sheet_only) > 8 else ''}")
     if unplaced:
         print(f"  {len(unplaced)} file(s) reach no live item - the branch rules, not this pass")
     if unreadable:

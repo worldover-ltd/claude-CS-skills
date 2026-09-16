@@ -62,7 +62,7 @@ as old as the content it restates, and saying so is what stops a stale sheet out
   "sourceFile": "Dissolvine GL-47-S - TDS.pdf",
   "sourceSha": "…the sha of the file you picked, copied from the task…",
   "documentDate": { "written": "14/03/2023", "label": "Issue Date", "kind": "issue" },
-  "why": "the only file with a composition table; the SDS gives hazard bands and omits the water",
+  "why": "the only file with a composition table; the dossier gives hazard bands and omits the water",
   "rows": [
     { "ingredient": "Tetrasodium Glutamate Diacetate", "cas": "51981-21-6", "ec": "257-573-7",
       "min": 47.5, "max": 48.0,
@@ -72,7 +72,8 @@ as old as the content it restates, and saying so is what stops a stale sheet out
       "quote": "Aqua/water  7732-18-5  231-791-2  balance  Solvent" }
   ],
   "rejected": [
-    { "fileName": "SDS 2022.pdf", "why": "hazard bands, not a composition — names methanol, omits water" }
+    { "fileName": "Product dossier 2022.pdf",
+      "why": "hazard bands, not a composition — names methanol, omits water" }
   ]
 }
 ```

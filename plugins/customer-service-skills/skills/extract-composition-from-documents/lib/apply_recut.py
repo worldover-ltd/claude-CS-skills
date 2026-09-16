@@ -62,6 +62,15 @@ def main():
         else:
             match = [entry for entry in body["files"] if entry["fileName"] == wanted]
             if not match:
+                sheets = {entry["fileName"] for entry in body.get("safetyDataSheets") or []}
+                if wanted in sheets:
+                    # Named rather than lumped in with a typo: somebody who picked this file picked the
+                    # document the folder has most of, and the reason it is refused is the whole point.
+                    problems.append(
+                        f"{recut_path.name}: {wanted!r} is a safety data sheet, which states the "
+                        f"hazards rather than the whole composition - it cannot be a source for "
+                        f"{identifier}")
+                    continue
                 names = ", ".join(entry["fileName"] for entry in body["files"])
                 problems.append(f"{recut_path.name}: {wanted!r} is not a candidate for {identifier} "
                                 f"- shortlisted are: {names}")

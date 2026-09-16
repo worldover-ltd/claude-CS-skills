@@ -35,9 +35,11 @@ the level's own distinct-name count:
   versions, "Final", "OLD", "scans" and "to check" are recorded as plain noise.
 
   Whether an "OLD" folder should be migrated at all is the user's call, and there is a step that asks it:
-  `plan_exclusions.py` ranks exactly these repeating names by how many parents they sit under and puts
-  them to the user. Note them here as candidates rather than deciding; nothing is left out until they say
-  so, and what they leave out is counted on the workbook.
+  `plan_exclusions.py` ranks these repeating names by how many parents they sit under, and lists
+  separately any name that says on its face it has been put away — which catches the other shape, one
+  `Archive` at the top of the tree holding thousands of files under a single parent. Note them here as
+  candidates rather than deciding; nothing is left out until they say so, and what they leave out is
+  counted on the workbook.
 
 Check the anchor against the app rather than against your reading of it. `check_branches.py` does exactly
 that, so a candidate anchor is worth writing into `BRANCHES.json` and testing rather than deliberating

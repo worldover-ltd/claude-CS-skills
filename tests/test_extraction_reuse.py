@@ -22,7 +22,7 @@ import extract_documents as ed  # noqa: E402
 def options(**over):
     base = {
         "scans": "first", "max_chars": 0, "ocr": False, "max_pages": 40,
-        "scale": 2.0, "enhance": False, "tables": True, "force": False,
+        "scale": 2.0, "enhance": False, "tables": True, "table_pages": 40, "force": False,
     }
     base.update(over)
     return types.SimpleNamespace(**base)

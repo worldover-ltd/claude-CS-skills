@@ -248,11 +248,17 @@ Ask before paying for it:
 <interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/plan_exclusions.py" ".workflow/active/${sessionId}"
 ```
 
-With no rules that prints the candidates and writes nothing: folder names ranked by how many different
-parents they repeat under, so the categories somebody made on purpose come first and an item's own
-folder sinks; and every extension with a count.
+With no rules that prints the candidates and writes nothing, in three lists: folder names that say on
+their face they have been put away — `Archive`, `Oud`, `Superseded`, `Vervallen`, `_old` — then every
+other name ranked by how many different parents it repeats under, so the categories somebody made on
+purpose come first and an item's own folder sinks, and then every extension with a count.
 
-Put those to the user as two short lists with counts and let them pick. Then record the decision:
+The first list exists because the ranking alone cannot see it. One `Archive` at the top of a tree sits
+under a single parent however many thousands of files it holds, so it sorts below every item folder and
+falls off the end of the sample — the shape the ranking finds is `Oud` repeated under three hundred
+item folders, which is a different thing.
+
+Put those to the user with counts and let them pick. Then record the decision:
 
 ```sh
 <interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/plan_exclusions.py" ".workflow/active/${sessionId}" --folders "Oud,Offertes" --extensions "msg,eml"

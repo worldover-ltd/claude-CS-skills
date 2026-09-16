@@ -24,9 +24,15 @@ invisible afterwards: an ingredient from one product landing in another product'
 A table listing what the material is made of, with a quantity against each component. Usually titled,
 usually summing to about 100, usually carrying CAS numbers.
 
+**A safety data sheet is never one of them, and none reaches you.** Its section 3 lists what is
+classified above a cut-off, so a correct sheet can omit the water and everything else that carries no
+hazard, and the result reads like a whole composition. `score_composition.py` refuses them before the
+shortlist is built and `docs/adr/0012` is the argument. What does reach you is `safetyDataSheets` on
+the task: the CAS and EC numbers off those sheets, under the name of the file they came from. Check a
+name against them; never transcribe a row from them, and never report one as your source.
+
 These are compositions:
 
-- an SDS **section 3** that lists every component, including the water
 - a supplier's **composition statement** or **composition breakdown** letter
 - a **product data record** with a composition table
 - a food **Product Information Form**'s ingredient declaration
@@ -34,9 +40,10 @@ These are compositions:
 
 These are not, however much they look like one:
 
-- a **hazard-band list**. An SDS section 3 that gives `≥ 30 - < 70` and names only the classified
-  components is answering a different question. On one real material it named methanol at 0.3-0.5%,
-  which appeared in no other document, and omitted both the water and the butylene glycol.
+- a **hazard-band list**. `≥ 30 - < 70` against only the classified components is answering a different
+  question. On one real material it named methanol at 0.3-0.5%, which appeared in no other document,
+  and omitted both the water and the butylene glycol. Most of these are sheets and never arrive; a
+  dossier can carry the same table under its own cover, and that one is yours to refuse.
 - a **specification**. `Assay 47.4% min` is a limit the batch must meet, not a statement of what is in
   the drum beside it.
 - a **certificate of analysis**. What one batch measured.

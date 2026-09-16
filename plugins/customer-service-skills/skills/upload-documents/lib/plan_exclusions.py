@@ -20,11 +20,29 @@ silently dropped real documents the last time, since 132 of that customer's file
 
 import argparse
 import json
+import re
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
 SAMPLE = 25
+
+# Names that mean "somebody kept this but stopped using it". Bounded on letters and digits rather
+# than on word boundaries, so `Gold` and `Bolder` are left alone while `_old` is caught: an underscore
+# is a word character, and a word boundary does not fire between one and a letter.
+#
+# This list decides nothing. It changes the order the candidates are printed in and marks them; a file
+# is still only left out once the user names the folder.
+HINTS = re.compile(
+    r"(?<![a-z0-9])(?:archiv\w*|archief|old|oud|oudste|previous|vorige|superseded|obsolete|"
+    r"vervallen|verlopen|expired|backups?|back-ups?|kopie|alt|alte|veraltet|deprecated|"
+    r"niet\s+meer\s+gebruiken|do\s+not\s+use|unused|temp|tmp|prullenbak|trash|"
+    r"ancien\w*|historie|history|historisch\w*)(?![a-z0-9])", re.I)
+
+
+def hinted(name):
+    """Whether a folder's name says, on its own, that somebody stopped using what is in it."""
+    return bool(HINTS.search(name or ""))
 
 
 def load(session_dir, name):
@@ -39,11 +57,17 @@ def as_list(value):
 
 
 def folder_candidates(files):
-    """[(name, parents it sits under, files beneath it)], the likeliest categories first.
+    """[(name, parents it sits under, files beneath it, its name says so)], likeliest first.
 
-    Ranked by how many different parents a name repeats under rather than by how many files it holds.
-    An item's own folder appears once; a name somebody repeated under every item — `Oud`, `Offertes`,
-    `Mail` — is a category, and a category is the only thing an exclusion rule can sensibly name.
+    Two shapes, and repetition only finds one of them. A name somebody repeated under every item —
+    `Oud`, `Offertes`, `Mail` — is a category, and ranking by how many different parents it sits under
+    puts those first while an item's own folder sinks. But one `Archive` at the top of the tree sits
+    under a single parent however many thousands of files it holds, so that ranking buries it below
+    every item folder and out of the sample the user is shown.
+
+    So a name that says what it is comes first regardless, marked, and the repetition ranking orders
+    everything within each group. Nothing here excludes anything; this is the order of a list somebody
+    is about to be asked about.
     """
     parents, beneath = defaultdict(set), Counter()
     for record in files:
@@ -52,8 +76,8 @@ def folder_candidates(files):
             key = name.casefold()
             parents[key].add("/".join(folders[:depth]))
             beneath[key] += 1
-    rows = [(key, len(parents[key]), beneath[key]) for key in beneath]
-    return sorted(rows, key=lambda row: (-row[1], -row[2], row[0]))
+    rows = [(key, len(parents[key]), beneath[key], hinted(key)) for key in beneath]
+    return sorted(rows, key=lambda row: (not row[3], -row[1], -row[2], row[0]))
 
 
 def excluded_by(record, folders, extensions):
@@ -88,12 +112,22 @@ def main():
 
     if not folders and not extensions and not options.none:
         print(f"{len(files)} file(s) in the tree. Nothing is excluded until you name it.\n")
+
+        def show(rows, heading):
+            print(heading)
+            for name, parent_count, count, _ in rows[:SAMPLE]:
+                where = "one place" if parent_count == 1 else f"{parent_count} different places"
+                print(f"  {name!r} — {count} file(s), in {where}")
+            if len(rows) > SAMPLE:
+                print(f"  ... and {len(rows) - SAMPLE} more")
+
         rows = folder_candidates(files)
-        print(f"FOLDER NAMES ({len(rows)}), the ones that repeat across the tree first:")
-        for name, parent_count, count in rows[:SAMPLE]:
-            print(f"  {name!r} — {count} file(s), under {parent_count} different parents")
-        if len(rows) > SAMPLE:
-            print(f"  ... and {len(rows) - SAMPLE} more")
+        flagged = [row for row in rows if row[3]]
+        if flagged:
+            show(flagged, f"FOLDER NAMES THAT SAY THEY ARE PUT AWAY ({len(flagged)}) — ask about these first:")
+            print()
+        rest = [row for row in rows if not row[3]]
+        show(rest, f"EVERY OTHER FOLDER NAME ({len(rest)}), the ones that repeat across the tree first:")
 
         exts = Counter((f["ext"] or "(none)").casefold() for f in files)
         print(f"\nEXTENSIONS ({len(exts)}):")

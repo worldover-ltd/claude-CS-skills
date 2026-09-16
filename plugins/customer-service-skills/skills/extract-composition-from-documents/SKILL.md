@@ -138,6 +138,29 @@ stops improving. A folder named `R289 - Dissolvine GL-47-S` needs a `folderLevel
 
 Done when the check places every file it can, and whatever it cannot has been named to the user.
 
+**Then decide what not to read**, with `upload-documents`' own step:
+
+```sh
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/plan_exclusions.py" ".workflow/active/${sessionId}"
+```
+
+With no rules that prints the candidates and writes nothing, in two lists: folder names that say on
+their face they are put away — `Archive`, `Oud`, `Superseded`, `Vervallen` — and then every other name
+ranked by how many parents it repeats under. Put both to the user with their counts and let them pick,
+then record it:
+
+```sh
+<interpreter> "${CLAUDE_PLUGIN_ROOT}/skills/upload-documents/lib/plan_exclusions.py" ".workflow/active/${sessionId}" --folders "Archief,Oud" --extensions "msg,eml"
+```
+
+or `--none` where everything is being carried. **Nothing is excluded unless the user names it** — the
+first list is an order, not a decision, because a blanket rule on names silently dropped real documents
+last time. On the first folder this ran against, 12,218 of 30,922 files were left out by decision, and
+here that is doubly worth asking: an archived sheet costs a conversion, an OCR pass and a place in a
+shortlist, and an out-of-date composition that wins on date is worse than no composition at all.
+
+Done when `EXCLUSIONS.json` exists and the user chose what is in it.
+
 # Step 4 — find the extraction somebody already paid for
 
 Reading three thousand documents takes half an hour, and another skill on this machine may have done it
@@ -177,21 +200,33 @@ they said yes.
 Then read them, through the `extract-document-text` skill:
 
 ```sh
-<uv> run --with rapidocr-onnxruntime "${CLAUDE_PLUGIN_ROOT}/skills/extract-document-text/lib/extract_documents.py" ".workflow/active/${sessionId}/DOCUMENTS.json" ".workflow/active/${sessionId}" --scans 3 --ocr
+<uv> run --with rapidocr-onnxruntime "${CLAUDE_PLUGIN_ROOT}/skills/extract-document-text/lib/extract_documents.py" ".workflow/active/${sessionId}/DOCUMENTS.json" ".workflow/active/${sessionId}" --scans all --ocr
 ```
 
 `--with rapidocr-onnxruntime` is not optional: `--ocr` without it stops the run before it converts a
-single file. No `--max-chars`, unlike a classification run — a composition sits in section 3 of a safety
-data sheet, and a head-and-tail cap reaches the cover page and the footer instead. OCR is what turns a
-scanned composition statement into text; on the folder this came from, one material's only composition
-was a photographed letter.
+single file.
+
+Three caps a classification run lives with are wrong here, because a composition sits wherever the
+supplier put it:
+
+- **No `--max-chars`.** A statement prints its table pages in, and a head-and-tail cap reaches the cover
+  page and the footer instead. On the folder this came from, 851 of 2,310 documents were at the cap, and
+  one material's whole ingredient table sat in the 19,889 characters that had been trimmed.
+- **`--scans all`, not `--scans 3`.** OCR is what turns a scanned composition statement into text — one
+  material's only composition was a photographed letter — and on that folder 339 scans run past three
+  pages. A composition on scanned page 7 does not exist in any other form, so the text is never written
+  and no later pass can recover it. This costs OCR time on every long scan, which is why a
+  classification run does not do it.
+- **`--table-pages`** defaults to the first 40 pages of a PDF. 205 documents on that folder run longer;
+  raise it where the user has catalogues or bound dossiers, and a document with more says so in its
+  `note` rather than dropping them quietly.
 
 **Where Step 4 adopted an extraction**, read only what it did not cover, into a directory of its own,
 and fold the result back in — the extractor writes a whole `EXTRACTED.json` and would otherwise replace
 the adopted one with just the leftovers:
 
 ```sh
-<uv> run --with rapidocr-onnxruntime "${CLAUDE_PLUGIN_ROOT}/skills/extract-document-text/lib/extract_documents.py" ".workflow/active/${sessionId}/STILL_TO_EXTRACT.json" ".workflow/active/${sessionId}/rest" --scans 3 --ocr
+<uv> run --with rapidocr-onnxruntime "${CLAUDE_PLUGIN_ROOT}/skills/extract-document-text/lib/extract_documents.py" ".workflow/active/${sessionId}/STILL_TO_EXTRACT.json" ".workflow/active/${sessionId}/rest" --scans all --ocr
 ```
 
 ```sh
@@ -224,8 +259,16 @@ wrongly culled is a composition nobody ever sees. Where a material shortlists no
 telling the user now — it is usually a folder of certificates and brochures, and no amount of reading
 will produce a composition from it.
 
-Done when `READINGS.json` names one task per material and the user has seen which materials shortlisted
-nothing.
+**Safety data sheets are the one hard cull, and it is a big one.** A sheet states the hazards rather
+than the whole composition, so none is ever a source; only its CAS and EC numbers travel to the reader,
+as reference. `docs/adr/0012` is the argument. The pass prints how many were left out and which
+materials have nothing else, and that second number is the one to put to the user in their own words —
+on the folder this was measured against it was 2,010 of 2,962 materials. Those are not failures and not
+empty folders: the supplier was asked for a sheet and never for a composition, so there is somebody to
+ask, and the workbook names each one.
+
+Done when `READINGS.json` names one task per material, and the user has seen both which materials
+shortlisted nothing and which have only safety data sheets.
 
 # Step 7 — read each material
 

@@ -25,6 +25,24 @@ ELSEWHERE = re.compile(
     r"toxicological|stability and reactivity|physical and chemical properties|transport information|"
     r"disposal considerations|exposure controls|accidental release|fire[- ]fighting|first[- ]aid", re.I)
 
+# A safety data sheet names itself, in whichever language it was written in. Held apart from the file
+# name, because a sheet quoted inside another document says the same words.
+SDS_TITLE = re.compile(
+    r"safety\s+data\s+sheet|veiligheidsinformatieblad|sicherheitsdatenblatt|"
+    r"fiche\s+de\s+donn[e\u00e9]es\s+de\s+s[e\u00e9]curit[e\u00e9]|ficha\s+de\s+datos\s+de\s+seguridad|"
+    r"scheda\s+(?:di\s+)?dati\s+di\s+sicurezza", re.I)
+
+# What the customer called the file. Precise where the text is not: over 3,771 sheets this fired on
+# 59% of them and on none of 639 compositions.
+SDS_FILE_NAME = re.compile(
+    r"\b(?:m?sds|vib|sdb|fds)\b|veiligheids\w*|sicherheitsdatenblatt", re.I)
+
+# The words around the phrase when the document is pointing at a sheet rather than being one.
+SDS_CROSS_REFERENCE = re.compile(r"\b(?:see|refer|available|request|consult|zie|siehe|voir)\b", re.I)
+
+SDS_TITLE_HEAD = 3000
+SDS_TITLE_LINE = 70
+
 PERCENT = re.compile(r"\d+(?:[.,]\d+)?\s*(?:[-\u2013]\s*\d+(?:[.,]\d+)?\s*)?%")
 BALANCE = re.compile(r"\bbalance\b|\bto\s*100\s*%|\bq\.?s\.?\s*(?:to|ad)\b|\bad\s*100\b", re.I)
 INCI = re.compile(r"\bINCI\b", re.I)
@@ -42,6 +60,31 @@ def file_key(path):
         return str(Path(path).resolve()).casefold()
     except (OSError, TypeError):
         return str(path).casefold()
+
+
+def looks_like_sds(text, file_name=""):
+    """Whether this file is a safety data sheet, and so never a composition's single source.
+
+    An SDS section 3 answers a different question. Under CLP it lists the substances classified above
+    their cut-off, so a sheet can be complete and correct and still omit the water, the solvent and
+    everything else that is not hazardous. Read as a composition it produces one with holes in it, and
+    on this customer's folder the sheets outnumber the composition statements six to one, so the
+    shortlist fills with them.
+
+    Two signals, measured against 3,771 files a classification run called SDS and 639 it called
+    Composition. What the customer named the file catches 59% of the sheets and none of the
+    compositions. The sheet's own title, standing on a line of its own rather than quoted inside a
+    sentence, takes that to 96.2% for 1.9% of compositions wrongly banned - the twelve are dossiers
+    that print the phrase as a heading over their own hazard summary.
+    """
+    if file_name and SDS_FILE_NAME.search(file_name):
+        return True
+    for line in (text or "")[:SDS_TITLE_HEAD].splitlines():
+        stripped = line.strip(" |#*\t")
+        if (SDS_TITLE.search(stripped) and len(stripped) <= SDS_TITLE_LINE
+                and not SDS_CROSS_REFERENCE.search(stripped)):
+            return True
+    return False
 
 
 def read_text(record):
